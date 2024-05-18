@@ -4,7 +4,7 @@ const dbConnect = require("./config/dbConnect");
 const { notFound, errorHandler } = require("./middlew/errorHandler");
 const app = express();
 const dotenv = require("dotenv").config();
-const PORT = 4000;
+const PORT = process.env.PORT;
 
 const authRouter = require("./routes/authRoute");
 const productRouter = require("./routes/productRoute");
