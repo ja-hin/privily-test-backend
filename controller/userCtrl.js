@@ -7,6 +7,13 @@ const { generateRefreshToken } = require("../config/refreshtoken");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { sendEmail } = require("./emailCtrl");
+const twilio = require("twilio");
+const MobileUserModel = require("../models/mobileUserModel");
+
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 // Create a User
 const createUser = asyncHandler(async (req, res) => {
@@ -52,6 +59,38 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
   }
 });
 
+const loginMobileUserCtrl = asyncHandler(async (req, res) => {
+  const { phoneNumber } = req.body;
+  if (!phoneNumber) {
+    return res.status(400).send("Phone number is required");
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
+
+  try {
+    let user = await MobileUserModel.findOne({ phoneNumber });
+    if (!user) {
+      user = new MobileUserModel({ phoneNumber });
+    }
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    await twilioClient.messages.create({
+      body: `Your OTP is ${otp}`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phoneNumber,
+    });
+
+    res.send("OTP sent successfully");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Failed to send OTP");
+  }
+});
+
 // admin login
 const loginAdmin = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -80,6 +119,33 @@ const loginAdmin = asyncHandler(async (req, res) => {
     });
   } else {
     throw new Error("Invalid Credentials");
+  }
+});
+
+const verifyMobileOtp = asyncHandler(async (req, res) => {
+  const { phoneNumber, otp } = req.body;
+  if (!phoneNumber || !otp) {
+    return res.status(400).send("Phone number and OTP are required");
+  }
+
+  try {
+    const user = await MobileUserModel.findOne({ phoneNumber });
+    if (!user) {
+      return res.status(400).send("User not found");
+    }
+
+    if (user.otp !== otp || new Date() > user.otpExpires) {
+      return res.status(400).send("Invalid or expired OTP");
+    }
+
+    user.otp = null;
+    user.otpExpires = null;
+    await user.save();
+
+    res.send("OTP verified successfully");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Failed to verify OTP");
   }
 });
 
@@ -866,6 +932,8 @@ const sendNotification = asyncHandler(async (req, res) => {
 module.exports = {
   createUser,
   loginUserCtrl,
+  loginMobileUserCtrl,
+  verifyMobileOtp,
   getallUser,
   getaUser,
   deleteaUser,
