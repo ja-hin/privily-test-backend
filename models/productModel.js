@@ -26,49 +26,12 @@ var productSchema = new mongoose.Schema(
     },
 
     location: {
-      lat: {
-        type: Number,
-        required: true,
-        max: 180,
-        min: -180,
-      },
-      lon: {
-        type: Number,
-        required: true,
-        max: 180,
-        min: -180,
-      },
-    },
-
-    address: {
-      line1: {
-        type: String,
-        required: true,
-      },
-      line2: {
-        type: String,
-        required: true,
-      },
-      city: {
-        type: String,
-        required: true,
-      },
-      state: {
-        type: String,
-        required: true,
-      },
-      country: {
-        type: String,
-        required: true,
-      },
-      zip: {
-        type: String,
-        required: true,
-      },
+      type: Number,
+      required: true,
     },
 
     category: {
-      type: String, // [Desk, MeetingRoom, PrivateOffice, Event and Lifestyle]
+      type: Number, // [Desk, MeetingRoom, PrivateOffice, Event and Lifestyle]
       required: true,
     },
 

@@ -29,6 +29,9 @@ app.use("/api/upload", uploadRouter);
 
 app.use(notFound);
 app.use(errorHandler);
+app.get('/', (req, res) => {
+  res.send('Hello, World!');
+});
 app.listen(PORT, () => {
   console.log(`Server is running  at PORT ${PORT}`);
 });

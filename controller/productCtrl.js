@@ -1,8 +1,10 @@
 const Product = require("../models/productModel");
+const Location = require("../models/locationModel");
 const User = require("../models/userModel");
 const asyncHandler = require("express-async-handler");
 const slugify = require("slugify");
 const validateMongoDbId = require("../utils/validateMongodbId");
+
 
 // create a pod with details
 const createProduct = asyncHandler(async (req, res) => {
@@ -217,6 +219,16 @@ const getAllProductAddress = asyncHandler(async (req, res) => {
   }
 });
 
+const getAllLocations = asyncHandler(async (req, res) => {
+  try {
+    const locations = await Location.all();
+    res.json({"data": locations});
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
 module.exports = {
   createProduct,
   getaProduct,
@@ -226,4 +238,5 @@ module.exports = {
   deleteProduct,
   rating,
   getAllProductAddress,
+  getAllLocations,
 };

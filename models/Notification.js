@@ -37,10 +37,10 @@ var Notification = new mongoose.Schema(
     },
 
     category: {
-      type: String, // [Desk, MeetingRoom, PrivateOffice, Event and Lifestyle]
+      type: Number, // [Desk, MeetingRoom, PrivateOffice, Event and Lifestyle]
       required: true,
     },
-    duraiton: {
+    duration: {
       type: String,
       required: true,
     },
