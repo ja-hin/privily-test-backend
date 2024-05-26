@@ -22,12 +22,11 @@ router.post("/terms-and-conditions", (req, res) =>
 router.post("/privacy-policy", (req, res) =>
     savePage({ ...req, body: { ...req.body, type: "privacy-policy" } }, res)
 );
+// Route to get all banners
+router.get('/banner', getBanner);
 
-// Route to get banner image by name
-router.get('/banner/:name', getBanner);
-
-// Route to create or update banner image by name
-router.post('/banner/:name', saveBanner);
+// Route to create or update banner images
+router.post('/banner', saveBanner);
 
 module.exports = router;
 

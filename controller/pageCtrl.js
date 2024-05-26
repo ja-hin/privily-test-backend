@@ -29,33 +29,55 @@ const savePage = async (req, res) => {
         res.status(500).send(err.message);
     }
 };
+
+//get banner images
 const getBanner = async (req, res) => {
     try {
-        const banner = await Banner.findOne({ name: req.params.name });
+        const banner = await Banner.findOne({});
         if (!banner) {
-            return res.status(404).json({ message: 'Banner not found' });
+            return res.status(404).json({ message: 'No banners found' });
         }
-        res.json({ imageUrl: banner.imageUrl, link: banner.link });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-};
-
-// Create or update banner image
-const saveBanner = async (req, res) => {
-    try {
-        const { imageUrl, link } = req.body;
-        const name = req.params.name;
-        const banner = await Banner.findOneAndUpdate(
-            { name },
-            { imageUrl, link },
-            { new: true, upsert: true }
-        );
         res.json(banner);
     } catch (err) {
         res.status(500).send(err.message);
     }
 };
+
+// Create or update banner images
+const saveBanner = async (req, res) => {
+    try {
+        const { banners } = req.body;
+
+        if (!banners || typeof banners !== 'object') {
+            return res.status(400).json({ message: 'Invalid request body' });
+        }
+
+        let banner = await Banner.findOne({});
+
+        if (!banner) {
+            // If no banner document exists, create one
+            const newBanner = new Banner(banners);
+            await newBanner.save();
+            return res.json(newBanner);
+        }
+
+        // If banner document exists, update the appropriate categories
+        for (const category in banners) {
+            if (banners.hasOwnProperty(category)) {
+                if (!banner[category]) {
+                    banner[category] = [];
+                }
+                banner[category] = banner[category].concat(banners[category]);
+            }
+        }
+        await banner.save();
+
+        res.json(banner);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+};
+
 
 module.exports = {
     getPage,
