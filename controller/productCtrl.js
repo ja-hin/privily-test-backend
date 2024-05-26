@@ -219,15 +219,6 @@ const getAllProductAddress = asyncHandler(async (req, res) => {
   }
 });
 
-const getAllLocations = asyncHandler(async (req, res) => {
-  try {
-    const locations = await Location.all();
-    res.json({"data": locations});
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server Error" });
-  }
-});
 
 module.exports = {
   createProduct,
@@ -238,5 +229,4 @@ module.exports = {
   deleteProduct,
   rating,
   getAllProductAddress,
-  getAllLocations,
 };

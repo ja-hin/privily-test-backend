@@ -3,10 +3,15 @@ const mongoose = require("mongoose"); // Erase if already required
 // Declare the Schema of the Mongo model
 var locationSchema = new mongoose.Schema(
   {
-    name: {
+    name: {  // name of restaurant or office etc.
+      type: String,
+      required: true,
+    },
+    slug: {
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
       index: true,
     },
     city: {
@@ -17,7 +22,7 @@ var locationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    country: {
+    country_code: {
       type: String,
       required: true,
     },
@@ -25,8 +30,20 @@ var locationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    latitude: {
+      type: Number,
+      required: true,
+      max: 90,
+      min: -90,
+    },
+    longitude: {
+      type: Number,
+      required: true,
+      max: 180,
+      min: -180,
+    },
   }
 );
 
 //Export the model
-module.exports = mongoose.model("PLocation", locationSchema);
+module.exports = mongoose.model("Location", locationSchema);

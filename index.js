@@ -11,6 +11,7 @@ const productRouter = require("./routes/productRoute");
 const categoryRouter = require("./routes/prodcategoryRoute");
 const uploadRouter = require("./routes/uploadRoute");
 const pageRouter = require("./routes/pageRoute")
+const locationRouter = require("./routes/locationRoute");
 
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
@@ -28,6 +29,7 @@ app.use("/api/product", productRouter);
 app.use("/api/category", categoryRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/api/pages", pageRouter)
+app.use("/api/location", locationRouter);
 
 app.use(notFound);
 app.use(errorHandler);
