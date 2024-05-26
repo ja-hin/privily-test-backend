@@ -1,4 +1,4 @@
-// models/User.js
+// models/mobileUserModel.js
 const mongoose = require('mongoose');
 
 const mobileUserSchema = new mongoose.Schema({
