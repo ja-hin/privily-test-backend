@@ -65,6 +65,7 @@ router.get("/all-bookings", authMiddleware, isAdmin, getBookings);
 router.get("/booking/:id", authMiddleware, getBookingById);
 router.put("/update-booking/:id", authMiddleware, updateBookingById);
 router.put("/cancle-booking/:id", authMiddleware, cancelBooking);
+router.put("/cancle-booking/:id", authMiddleware, cancelBooking);
 
 router.put(
   "/auto-update-booking-status",

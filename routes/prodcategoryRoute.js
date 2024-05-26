@@ -9,7 +9,7 @@ const {
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
 const router = express.Router();
 
-router.post("/", authMiddleware, isAdmin, createCategory);
+router.post("/create", createCategory);
 router.put("/:id", authMiddleware, isAdmin, updateCategory);
 router.delete("/:id", authMiddleware, isAdmin, deleteCategory);
 router.get("/:id", getCategory);

@@ -1,5 +1,6 @@
 const Product = require("../models/productModel");
 const Location = require("../models/locationModel");
+const ProductAvailability = require("../models/productAvailability");
 const User = require("../models/userModel");
 const asyncHandler = require("express-async-handler");
 const slugify = require("slugify");
@@ -9,10 +10,11 @@ const validateMongoDbId = require("../utils/validateMongodbId");
 // create a pod with details
 const createProduct = asyncHandler(async (req, res) => {
   try {
+    location_obj = await Location.findOne({_id: req.body.location})
+    req.body.location = location_obj._id
     if (req.body.title) {
-      req.body.slug = slugify(req.body.title);
+      req.body.slug = slugify(req.body.title+"_"+location_obj.slug);
     }
-    // console.log(req.body);
     const newProduct = await Product.create(req.body);
     res.json(newProduct);
   } catch (error) {
@@ -93,26 +95,41 @@ const getAllProducts = asyncHandler(async (req, res) => {
   }
 });
 
+const getLocationsFromCity = async (city_name)=> {
+  const locations = Location.find({ city: city_name }, '_id').exec()
+  // .then(locations => {
+  //   console.log("success")
+  //   const ids = locations.map(location => location._id);
+  // })
+  // .catch(err => {
+  //   console.error('Error finding locations:', err);
+  //   throw new Error("Some Internal Server Error Occurred.")
+  // })
+  return locations;
+}
 // get all pod details using filter
 const getAllProductUsingFilter = asyncHandler(async (req, res) => {
   try {
     // Filtering
     const queryObj = { ...req.query };
+    if (req?.query?.city){
+      const locations = await getLocationsFromCity(req.query.city);
+      queryObj['location'] = { $in: locations.map(location => location._id)};
+    }
+    delete queryObj['city']
     const excludeFields = ["page", "sort", "limit", "fields"];
     excludeFields.forEach((el) => delete queryObj[el]);
     let queryStr = JSON.stringify(queryObj);
     queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
-
     let query = Product.find(JSON.parse(queryStr));
-
+    
     // Sorting
     if (req.query.sort) {
       const sortCriteria = req.query.sort.split(",").map((field) => {
         if (field === "rating") return { totalrating: -1 };
-        if (field === "pricePerSlot") return { pricePerSlot: 1 };
+        // if (field === "pricePerSlot") return { pricePerSlot: 1 };
         if (field === "pricePerSlot") return { pricePerSlot: 1000000 };
         if (field === "category") return { category: 1 };
-        if (field === "location") return { "address.city": 1 };
         if (field === "size") return { size: 1 };
       });
       query = query.sort(sortCriteria);
@@ -219,6 +236,41 @@ const getAllProductAddress = asyncHandler(async (req, res) => {
   }
 });
 
+const productAvailability = asyncHandler(async (req, res) => {
+  try {
+    start_time = '6:00' // 6 am
+    end_time = '24:00' // till EOD
+    if (!req?.query?.booking_date){
+      res.status(500).json({ message: "Please provide a Booking Date" });
+    }
+    targetDate = new Date(req.query.booking_date);
+    // Fetch a product availability
+    const id = req.params.id;
+    const product_availability = await ProductAvailability.findOne({product_id: id, createdAt: {
+      $gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()),
+      $lt: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1)
+  }})
+    if (!product_availability){
+      res.status(500).json({ message: "Please provide a Booking Date" });
+    }
+    
+    res.json({product_availability, 'start_time': start_time, 'end_time': end_time});
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// Create availability
+// start_time = 6 // 6 am
+// end_time = 24 // till EOD
+// indexes = (24-6)*60/15
+// data = {
+//   "product_id": id,
+//   "slot_bookings": Array.from({ length: indexes }, () => false),
+//   "available_slot":[]
+// }
+// ProductAvailability.create(data);
 
 module.exports = {
   createProduct,
@@ -229,4 +281,5 @@ module.exports = {
   deleteProduct,
   rating,
   getAllProductAddress,
+  productAvailability
 };
