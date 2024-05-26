@@ -48,6 +48,12 @@ const bookingSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    feedback: [
+      {
+        rating: Number,
+        message: String,
+      }
+    ],
 
     // totalCost: {
     //   type: Number,

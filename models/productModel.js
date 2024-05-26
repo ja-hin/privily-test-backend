@@ -3,7 +3,7 @@ const mongoose = require("mongoose"); // Erase if already required
 // Declare the Schema of the Mongo model
 var productSchema = new mongoose.Schema(
   {
-    productId: {
+    deviceId: {
       type: String,
       required: true,
     },
@@ -26,12 +26,14 @@ var productSchema = new mongoose.Schema(
     },
 
     location: {
-      type: Number,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Location",
       required: true,
     },
 
     category: {
-      type: Number, // [Desk, MeetingRoom, PrivateOffice, Event and Lifestyle]
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "PCategory",
       required: true,
     },
 
@@ -46,15 +48,9 @@ var productSchema = new mongoose.Schema(
     },
 
     features: [
-      // { feature: "Ventilated", value: "value1" },
-      // { feature: "Sound Proof", value: "value2" },
-      // { feature: "Comfortable Seating", value: "value3" },
-      // { feature: "Wifi from hosting facility", value: "value4" },
-      // { feature: "Electric Connection", value: "value5" },
-
       {
-        feature: String,
-        value: String,
+        name: String,
+        icon: String,
       },
     ],
 

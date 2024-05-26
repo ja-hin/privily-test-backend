@@ -709,6 +709,22 @@ const cancelBooking = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
+
+const bookingFeedback =  asyncHandler(async (req, res) => {
+  try{
+    booking_id = req.params.id;
+    message = req.body.message
+    rating = req.body.rating
+    const booking = await Booking.findById(booking_id);
+    const updatedBooking = await Booking.findByIdAndUpdate(booking_id, { 'feedback.rating': rating, 'feedback.message': message }, {
+      new: true,
+    });
+    res.json(updatedBooking)
+  } catch (error) {
+    throw new Error(error);
+  }
+})
+
 const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
   validateMongoDbId(userId);
   validateMongoDbId(bookingId);
@@ -959,4 +975,5 @@ module.exports = {
   setCurrentLocation,
   sendNotification,
   rateBooking,
+  bookingFeedback,
 };
