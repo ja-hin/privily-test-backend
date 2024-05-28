@@ -59,6 +59,46 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
   }
 });
 
+// const loginMobileUserCtrl = asyncHandler(async (req, res) => {
+//   const { phoneNumber, user } = req.body;
+  
+//   if (!phoneNumber || !user) {
+//     return res.status(400).send("Phone number and user ID are required");
+//   }
+
+//   // Check if the user ID exists in the User collection
+//   const userExists = await User.findById(user);
+//   if (!userExists) {
+//     return res.status(400).send("Invalid user ID");
+//   }
+
+//   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+//   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
+
+//   try {
+//     let mobileUser = await MobileUserModel.findOne({ phoneNumber });
+//     if (!mobileUser) {
+//       mobileUser = new MobileUserModel({ phoneNumber, user });
+//     } else {
+//       mobileUser.user = user; // Ensure the user field is updated if it already exists
+//     }
+
+//     mobileUser.otp = otp;
+//     mobileUser.otpExpires = otpExpires;
+//     await mobileUser.save();
+
+//     await twilioClient.messages.create({
+//       body: `Your OTP is ${otp}`,
+//       from: process.env.TWILIO_PHONE_NUMBER,
+//       to: phoneNumber,
+//     });
+
+//     res.send("OTP sent successfully");
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).send("Failed to send OTP");
+//   }
+// });
 const loginMobileUserCtrl = asyncHandler(async (req, res) => {
   const { phoneNumber } = req.body;
   if (!phoneNumber) {
@@ -124,6 +164,7 @@ const loginAdmin = asyncHandler(async (req, res) => {
 
 const verifyMobileOtp = asyncHandler(async (req, res) => {
   const { phoneNumber, otp } = req.body;
+  console.log(phoneNumber, otp, "otp")
   if (!phoneNumber || !otp) {
     return res.status(400).send("Phone number and OTP are required");
   }
