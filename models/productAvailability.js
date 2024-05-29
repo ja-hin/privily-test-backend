@@ -11,16 +11,16 @@ const bookingSchema = new mongoose.Schema(
         type: [Boolean], // Array of Booleans
         required: true,
     },
-    available_slots: {
-    type: [Number], // Array of Numbers (integers)
-    required: true,
-    validate: {
-        validator: function (arr) {
-        return arr.every(Number.isInteger); // Ensure all elements are integers
-        },
-        message: 'All elements in the integers array must be integers'
-    }
-    }
+    // available_slots: {
+    // type: [Number], // Array of Numbers (integers)
+    // required: true,
+    // validate: {
+    //     validator: function (arr) {
+    //     return arr.every(Number.isInteger); // Ensure all elements are integers
+    //     },
+    //     message: 'All elements in the integers array must be integers'
+    // }
+    // }
   },
   {
     timestamps: true,

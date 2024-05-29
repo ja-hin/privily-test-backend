@@ -9,6 +9,7 @@ const jwt = require("jsonwebtoken");
 const { sendEmail } = require("./emailCtrl");
 const twilio = require("twilio");
 const MobileUserModel = require("../models/mobileUserModel");
+const ProductAvailability = require("../models/productAvailability");
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -463,6 +464,25 @@ const resetPassword = asyncHandler(async (req, res) => {
 
 // _______________________________________________________________________________________________
 
+// Create availability
+// start_time = 6 // 6 am
+// end_time = 24 // till EOD
+// indexes = (24-6)*60/15
+// data = {
+//   "product_id": id,
+//   "slot_bookings": Array.from({ length: indexes }, () => false),
+//   "available_slot":[]
+// }
+// ProductAvailability.create(data);
+
+function get_slot_index_from_time(time_obj, start_time){
+  const hours = time_obj.getHours();
+  const minutes = time_obj.getMinutes();
+
+  let index = (hours-start_time)*4 + minutes/15;
+  return index;
+}
+
 // Create a booking for a user with podId, timeSlot and status as pending by default
 const createBooking = asyncHandler(async (req, res) => {
   const { _id } = req.user;
@@ -535,6 +555,45 @@ const createBooking = asyncHandler(async (req, res) => {
 
     user.booking.push(newBooking._id);
     await user.save();
+
+    // create product availability entry or update if there is any existing entry
+    const product_availability = await ProductAvailability.findOne({product_id: id, createdAt: {
+      $gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()),
+      $lt: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1)
+  }})
+    
+  if (product_availability){
+    // update the slot
+    let slot_bookings_new =  product_availability.slot_bookings
+    starting_index = get_slot_index_from_time(startTimeObj, START_TIME)
+    ending_index = get_slot_index_from_time(endTimeObj, START_TIME)
+    for(let i=0; i>starting_index && i<ending_index; i++){
+      slot_bookings_new[i] = true
+    }
+
+    // uodate slot_bookings_new in ProductAvailability.slot_bookings
+
+  }
+  else{
+    // create new entry in DB
+    indexes = (END_TIME-START_TIME)*4
+    data = {
+      "product_id": id,
+      "slot_bookings": Array.from({ length: indexes }, () => false),
+    }
+    ProductAvailability.create(data);
+  }
+
+
+    // start_time = 6 // 6 am
+// end_time = 24 // till EOD
+// indexes = (24-6)*60/15
+// data = {
+//   "product_id": id,
+//   "slot_bookings": Array.from({ length: indexes }, () => false),
+//   "available_slot":[]
+// }
+// ProductAvailability.create(data);
     sendNotificationOnBooking(user._id, newBooking._id);
 
     res

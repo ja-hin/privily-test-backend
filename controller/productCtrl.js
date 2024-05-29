@@ -261,16 +261,6 @@ const productAvailability = asyncHandler(async (req, res) => {
   }
 });
 
-// Create availability
-// start_time = 6 // 6 am
-// end_time = 24 // till EOD
-// indexes = (24-6)*60/15
-// data = {
-//   "product_id": id,
-//   "slot_bookings": Array.from({ length: indexes }, () => false),
-//   "available_slot":[]
-// }
-// ProductAvailability.create(data);
 
 module.exports = {
   createProduct,

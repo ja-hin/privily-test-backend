@@ -49,7 +49,6 @@ router.put("/reset-password/:token", resetPassword);
 router.put("/password", authMiddleware, updatePassword);
 router.get("/refresh", handleRefreshToken);
 
-router.get("/:id", authMiddleware, isAdmin, getaUser);
 router.get("/all-users", getallUser);
 router.delete("/:id", authMiddleware, isAdmin, deleteaUser);
 router.put("/edit-user", authMiddleware, updatedUser);
@@ -61,12 +60,13 @@ router.put("/unblock-user/:id", authMiddleware, isAdmin, unblockUser);
 // router.post("/apply-coupon", authMiddleware, applyCoupon);
 
 router.post("/create-booking/:podId", authMiddleware, createBooking);
-router.get("/all-bookingsByUser", authMiddleware, getBookingsByUser); // not working
+router.get("/all-bookingsByUser", authMiddleware, getBookingsByUser);
 router.get("/all-bookings", authMiddleware, isAdmin, getBookings);
 
 router.get("/booking/:id", authMiddleware, getBookingById);
 router.put("/update-booking/:id", authMiddleware, updateBookingById);
 router.put("/cancel-booking/:id", authMiddleware, cancelBooking);
+router.get("/:id", authMiddleware, isAdmin, getaUser);
 
 
 router.put(
