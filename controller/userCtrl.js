@@ -476,7 +476,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 // }
 // ProductAvailability.create(data);
 
-function get_slot_index_from_time(time_obj, start_time){
+function get_slot_index_from_time(time_obj, start_time) {
   const hours = time_obj.getHours();
   const minutes = time_obj.getMinutes();
   return (hours - start_time) * 4 + Math.floor(minutes / 15);
@@ -489,8 +489,7 @@ const createBooking = asyncHandler(async (req, res) => {
   validateMongoDbId(_id);
   validateMongoDbId(podId);
   try {
-    const { bookingDate, startTime, endTime, timeSlotNumber, bookingPurpose } =
-      req.body;
+    const { bookingDate, startTime, endTime, timeSlotNumber, bookingPurpose } = req.body;
 
     const user = await User.findById(_id);
     if (!user) {
@@ -502,45 +501,26 @@ const createBooking = asyncHandler(async (req, res) => {
     const startTimeObj = new Date(startTime);
     const endTimeObj = new Date(endTime);
 
-    // Convert to IST (add 5 hours and 30 minutes)
-    // bookingDateObj.setHours(bookingDateObj.getHours() + 5);
-    // bookingDateObj.setMinutes(bookingDateObj.getMinutes() + 30);
-    startTimeObj.setHours(startTimeObj.getHours() - 5);
-    startTimeObj.setMinutes(startTimeObj.getMinutes() - 30);
-    endTimeObj.setHours(endTimeObj.getHours() - 5);
-    endTimeObj.setMinutes(endTimeObj.getMinutes() - 30);
+    // Convert start and end times to UTC (assuming they are in IST)
+    startTimeObj.setUTCHours(startTimeObj.getUTCHours() - 5);
+    startTimeObj.setUTCMinutes(startTimeObj.getUTCMinutes() - 30);
+    endTimeObj.setUTCHours(endTimeObj.getUTCHours() - 5);
+    endTimeObj.setUTCMinutes(endTimeObj.getUTCMinutes() - 30);
 
     // Check for overlapping bookings
     const existingBooking = await Booking.findOne({
       podId,
       $or: [
-        {
-          $and: [
-            { startTime: { $lte: startTimeObj } },
-            { endTime: { $gte: endTimeObj } },
-          ],
-        }, // Check if new booking starts during existing booking
-        {
-          $and: [
-            { startTime: { $lte: endTimeObj } },
-            { endTime: { $gte: endTimeObj } },
-          ],
-        }, // Check if new booking ends during existing booking
-        {
-          $and: [
-            { startTime: { $gte: startTimeObj } },
-            { endTime: { $lte: endTimeObj } },
-          ],
-        }, // Check if new booking is completely within existing booking
-      ],
+        { startTime: { $lte: startTimeObj }, endTime: { $gte: startTimeObj } },
+        { startTime: { $lte: endTimeObj }, endTime: { $gte: endTimeObj } },
+        { startTime: { $gte: startTimeObj }, endTime: { $lte: endTimeObj } }
+      ]
     });
 
     if (existingBooking) {
-      return res.status(400).json({
-        message: "Booking with the same date and time already exists",
-      });
+      return res.status(400).json({ message: "Booking with the same date and time already exists" });
     }
-    
+
     // Generate QR Code Data String
     const deviceID = podId.toString();
     const userID = user._id.toString();
@@ -548,8 +528,7 @@ const createBooking = asyncHandler(async (req, res) => {
     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000).toString();
     const qrCodeDataString = `F2/${deviceID}/${userID}/0/${endTimeStamp}/${startTimeStamp}`;
 
-    //createing new booking
-
+    // Create new booking
     const newBooking = await Booking.create({
       user: user._id,
       podId,
@@ -565,71 +544,52 @@ const createBooking = asyncHandler(async (req, res) => {
     user.booking.push(newBooking._id);
     await user.save();
 
-    // create product availability entry or update if there is any existing entry
-    const product_availability = await ProductAvailability.findOne({product_id: podId, createdAt: {
-      $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
-      $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
-  }})
-    
-  if (product_availability){
-    // update the slot
-    let updatedSlotBookings=  product_availability.slot_bookings;
-   const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME)
-   const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME)
-   
-   for (let i = startingIndex; i < endingIndex; i++) {
-    updatedSlotBookings[i] = true;
-  }
+    // Create or update product availability entry
+    const productAvailability = await ProductAvailability.findOne({
+      product_id: podId,
+      createdAt: {
+        $gte: new Date(Date.UTC(bookingDateObj.getUTCFullYear(), bookingDateObj.getUTCMonth(), bookingDateObj.getUTCDate())),
+        $lt: new Date(Date.UTC(bookingDateObj.getUTCFullYear(), bookingDateObj.getUTCMonth(), bookingDateObj.getUTCDate() + 1))
+      }
+    });
+    console.log("check")
+    console.log(productAvailability)
 
-    // uodate slot_bookings_new in ProductAvailability.slot_bookings
-    productAvailability.slot_bookings = updatedSlotBookings;
-    await productAvailability.save();
+    if (productAvailability) {
+      // Update slot bookings
+      console.log("Enter Product availibility")
+      let updatedSlotBookings = productAvailability.slot_bookings;
+      const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
+      const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
 
-  }else {
-    // Create new product availability entry
-    const indexes = (END_TIME - START_TIME) * 4;
-    const slotBookings = Array.from({ length: indexes }, () => false);
-    const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
-    const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+      for (let i = startingIndex; i < endingIndex; i++) {
+        updatedSlotBookings[i] = true;
+      }
 
-    for (let i = startingIndex; i < endingIndex; i++) {
-      slotBookings[i] = true;
+      productAvailability.slot_bookings = updatedSlotBookings;
+      await productAvailability.save();
+    } else {
+      // Create new product availability entry
+      const indexes = (END_TIME - START_TIME) * 4;
+      const slotBookings = Array.from({ length: indexes }, () => false);
+      const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
+      const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+
+      for (let i = startingIndex; i < endingIndex; i++) {
+        slotBookings[i] = true;
+      }
+
+      const data = {
+        product_id: podId,
+        slot_bookings: slotBookings,
+      };
+      await ProductAvailability.create(data);
     }
 
-    const data = {
-      product_id: podId,
-      slot_bookings: slotBookings,
-    };
-    await ProductAvailability.create(data);
-  }
-  // else{
-  //   // create new entry in DB
-  //   consindexes = (END_TIME-START_TIME)*4
-  //   data = {
-  //     "product_id": id,
-  //     "slot_bookings": Array.from({ length: indexes }, () => false),
-  //   }
-  //   ProductAvailability.create(data);
-  // }
-
-
-    // start_time = 6 // 6 am
-// end_time = 24 // till EOD
-// indexes = (24-6)*60/15
-// data = {
-//   "product_id": id,
-//   "slot_bookings": Array.from({ length: indexes }, () => false),
-//   "available_slot":[]
-// }
-// ProductAvailability.create(data);
-console.log(user._id, newBooking._id, "booking notification")
     sendNotificationOnBooking(user._id, newBooking._id);
-
-    res
-      .status(201)
-      .json({ message: "Booking created successfully", booking: newBooking });
+    res.status(201).json({ message: "Booking created successfully", booking: newBooking });
   } catch (error) {
-    console.error(error); // Log the error for debugging purposes
+    console.error(error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -646,12 +606,8 @@ const sendNotificationOnBooking = asyncHandler(async (userId, bookingId) => {
 
     // Format booking date and times
     const formattedBookingDate = booking.bookingDate.toDateString();
-    const formattedStartTime = booking.startTime.toLocaleTimeString("en-US", {
-      hour12: true,
-    });
-    const formattedEndTime = booking.endTime.toLocaleTimeString("en-US", {
-      hour12: true,
-    });
+    const formattedStartTime = booking.startTime.toLocaleTimeString("en-US", { hour12: true });
+    const formattedEndTime = booking.endTime.toLocaleTimeString("en-US", { hour12: true });
 
     // Construct email content
     const emailContent = `
@@ -662,8 +618,7 @@ const sendNotificationOnBooking = asyncHandler(async (userId, bookingId) => {
         <li><strong>Booking Date:</strong> ${formattedBookingDate}</li>
         <li><strong>Start Time:</strong> ${formattedStartTime}</li>
         <li><strong>End Time:</strong> ${formattedEndTime}</li>
-        <li><strong>Pod ID:</strong> ${booking.podId.name}</li> <!-- Assuming 'name' is the property for pod name -->
-        <!-- Include other necessary details -->
+        <li><strong>Pod ID:</strong> ${booking.podId.name}</li>
       </ul>
       <p>Thank you for booking with us!</p>
     `;
@@ -676,7 +631,7 @@ const sendNotificationOnBooking = asyncHandler(async (userId, bookingId) => {
     };
     await sendEmail(data.to, data.subject, data.html);
 
-    console.log("Email sent successfully."); // Log success
+    console.log("Email sent successfully.");
   } catch (error) {
     console.error("Error sending notification:", error.message);
     throw new Error("Failed to send notification");
