@@ -10,6 +10,7 @@ const { sendEmail } = require("./emailCtrl");
 const twilio = require("twilio");
 const MobileUserModel = require("../models/mobileUserModel");
 const ProductAvailability = require("../models/productAvailability");
+const { START_TIME, END_TIME } = require('./constants');
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -478,9 +479,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 function get_slot_index_from_time(time_obj, start_time){
   const hours = time_obj.getHours();
   const minutes = time_obj.getMinutes();
-
-  let index = (hours-start_time)*4 + minutes/15;
-  return index;
+  return (hours - start_time) * 4 + Math.floor(minutes / 15);
 }
 
 // Create a booking for a user with podId, timeSlot and status as pending by default
@@ -541,6 +540,15 @@ const createBooking = asyncHandler(async (req, res) => {
         message: "Booking with the same date and time already exists",
       });
     }
+    
+    // Generate QR Code Data String
+    const deviceID = podId.toString();
+    const userID = user._id.toString();
+    const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000).toString();
+    const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000).toString();
+    const qrCodeDataString = `F2/${deviceID}/${userID}/0/${endTimeStamp}/${startTimeStamp}`;
+
+    //createing new booking
 
     const newBooking = await Booking.create({
       user: user._id,
@@ -551,38 +559,58 @@ const createBooking = asyncHandler(async (req, res) => {
       timeSlotNumber,
       bookingPurpose,
       status: "Pending",
+      qrCodeData: qrCodeDataString,
     });
 
     user.booking.push(newBooking._id);
     await user.save();
 
     // create product availability entry or update if there is any existing entry
-    const product_availability = await ProductAvailability.findOne({product_id: id, createdAt: {
-      $gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()),
-      $lt: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1)
+    const product_availability = await ProductAvailability.findOne({product_id: podId, createdAt: {
+      $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
+      $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
   }})
     
   if (product_availability){
     // update the slot
-    let slot_bookings_new =  product_availability.slot_bookings
-    starting_index = get_slot_index_from_time(startTimeObj, START_TIME)
-    ending_index = get_slot_index_from_time(endTimeObj, START_TIME)
-    for(let i=0; i>starting_index && i<ending_index; i++){
-      slot_bookings_new[i] = true
-    }
+    let updatedSlotBookings=  product_availability.slot_bookings;
+   const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME)
+   const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME)
+   
+   for (let i = startingIndex; i < endingIndex; i++) {
+    updatedSlotBookings[i] = true;
+  }
 
     // uodate slot_bookings_new in ProductAvailability.slot_bookings
+    productAvailability.slot_bookings = updatedSlotBookings;
+    await productAvailability.save();
 
-  }
-  else{
-    // create new entry in DB
-    indexes = (END_TIME-START_TIME)*4
-    data = {
-      "product_id": id,
-      "slot_bookings": Array.from({ length: indexes }, () => false),
+  }else {
+    // Create new product availability entry
+    const indexes = (END_TIME - START_TIME) * 4;
+    const slotBookings = Array.from({ length: indexes }, () => false);
+    const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
+    const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+
+    for (let i = startingIndex; i < endingIndex; i++) {
+      slotBookings[i] = true;
     }
-    ProductAvailability.create(data);
+
+    const data = {
+      product_id: podId,
+      slot_bookings: slotBookings,
+    };
+    await ProductAvailability.create(data);
   }
+  // else{
+  //   // create new entry in DB
+  //   consindexes = (END_TIME-START_TIME)*4
+  //   data = {
+  //     "product_id": id,
+  //     "slot_bookings": Array.from({ length: indexes }, () => false),
+  //   }
+  //   ProductAvailability.create(data);
+  // }
 
 
     // start_time = 6 // 6 am
@@ -594,6 +622,7 @@ const createBooking = asyncHandler(async (req, res) => {
 //   "available_slot":[]
 // }
 // ProductAvailability.create(data);
+console.log(user._id, newBooking._id, "booking notification")
     sendNotificationOnBooking(user._id, newBooking._id);
 
     res
