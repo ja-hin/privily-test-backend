@@ -111,14 +111,14 @@ const loginMobileUserCtrl = asyncHandler(async (req, res) => {
   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
 
   try {
-    let user = await MobileUserModel.findOne({ phoneNumber });
-    if (!user) {
-      user = new MobileUserModel({ phoneNumber });
+    let mobileUser = await MobileUserModel.findOne({ phoneNumber });
+    if (!mobileUser) {
+      mobileUser = new MobileUserModel({ phoneNumber });
     }
 
-    user.otp = otp;
-    user.otpExpires = otpExpires;
-    await user.save();
+    mobileUser.otp = otp;
+    mobileUser.otpExpires = otpExpires;
+    await mobileUser.save();
 
     await twilioClient.messages.create({
       body: `Your OTP is ${otp}`,
@@ -126,7 +126,22 @@ const loginMobileUserCtrl = asyncHandler(async (req, res) => {
       to: phoneNumber,
     });
 
-    res.send("OTP sent successfully");
+    // res.send("OTP sent successfully");
+
+
+    const refreshToken = await generateRefreshToken(mobileUser?.user?._id);
+    const updateuser = await User.findByIdAndUpdate(
+      mobileUser?.user?.id,
+      {
+        refreshToken: refreshToken,
+      },
+      { new: true }
+    );
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      maxAge: 72 * 60 * 60 * 1000,
+    });
+    res.json({token: generateToken(mobileUser?.user?._id)})
   } catch (error) {
     console.error(error);
     res.status(500).send("Failed to send OTP");
