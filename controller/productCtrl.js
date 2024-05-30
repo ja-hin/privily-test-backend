@@ -5,7 +5,7 @@ const User = require("../models/userModel");
 const asyncHandler = require("express-async-handler");
 const slugify = require("slugify");
 const validateMongoDbId = require("../utils/validateMongodbId");
-
+const { START_TIME, END_TIME } = require('./constants');
 
 // create a pod with details
 const createProduct = asyncHandler(async (req, res) => {
@@ -246,23 +246,23 @@ const getAllProductAddress = asyncHandler(async (req, res) => {
 
 const productAvailability = asyncHandler(async (req, res) => {
   try {
-    start_time = '6:00' // 6 am
-    end_time = '24:00' // till EOD
     if (!req?.query?.booking_date){
       res.status(500).json({ message: "Please provide a Booking Date" });
     }
     targetDate = new Date(req.query.booking_date);
     // Fetch a product availability
     const id = req.params.id;
-    const product_availability = await ProductAvailability.findOne({product_id: id, createdAt: {
-      $gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()),
-      $lt: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1)
-  }})
+    let product_availability = await ProductAvailability.findOne({product_id: id, createdAt: {
+      $gte: new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())),
+      $lt: new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate() + 1))
+  }}).select('product_id slot_bookings')
     if (!product_availability){
-      res.status(500).json({ message: "Please provide a Booking Date" });
+      const indexes = (END_TIME - START_TIME) * 4;
+      const slotBookings = Array.from({ length: indexes }, () => false);
+      product_availability = new ProductAvailability({product_id: id, slot_bookings:slotBookings})
     }
     
-    res.json({product_availability, 'start_time': start_time, 'end_time': end_time});
+    res.json({product_availability, 'start_time': START_TIME, 'end_time': END_TIME});
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server Error" });
