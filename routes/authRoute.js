@@ -31,6 +31,7 @@ const {
   rateBooking,
   loginMobileUserCtrl,
   verifyMobileOtp,
+  bookingFeedback,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -66,6 +67,7 @@ router.get("/all-bookings", authMiddleware, isAdmin, getBookings);
 router.get("/booking/:id", authMiddleware, getBookingById);
 router.put("/update-booking/:id", authMiddleware, updateBookingById);
 router.put("/cancel-booking/:id", authMiddleware, cancelBooking);
+router.put("/feedback/:id", authMiddleware, bookingFeedback);
 router.get("/:id", authMiddleware, isAdmin, getaUser);
 
 
