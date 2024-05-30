@@ -78,7 +78,7 @@ const getaProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
   try {
-    const findProduct = await Product.findById(id);
+    const findProduct = await Product.findById(id).populate({ path: 'location' });;
     res.json(findProduct);
   } catch (error) {
     throw new Error(error);
@@ -88,15 +88,17 @@ const getaProduct = asyncHandler(async (req, res) => {
 // get all pod details
 const getAllProducts = asyncHandler(async (req, res) => {
   try {
-    const products = await Product.find();
+    const products = await Product.find().populate({ path: 'location' });;
     res.json(products);
   } catch (error) {
     throw new Error(error);
   }
 });
 
+// var geocoder = require('local-reverse-geocoder');
+
 const getLocationsFromCity = async (city_name)=> {
-  const locations = Location.find({ city: city_name }, '_id').exec()
+  const locations = Location.find({ city:  { $regex: new RegExp(city_name, 'i') } }).exec()
   // .then(locations => {
   //   console.log("success")
   //   const ids = locations.map(location => location._id);
@@ -107,6 +109,12 @@ const getLocationsFromCity = async (city_name)=> {
   // })
   return locations;
 }
+// console.log("arrived")
+// var point = { latitude: 42.083333, longitude: 3.1 };
+// geocoder.lookUp(point, function (err, res) {
+//   console.log(JSON.stringify(res, null, 2));
+// });
+// return "ok"
 // get all pod details using filter
 const getAllProductUsingFilter = asyncHandler(async (req, res) => {
   try {
@@ -121,7 +129,7 @@ const getAllProductUsingFilter = asyncHandler(async (req, res) => {
     excludeFields.forEach((el) => delete queryObj[el]);
     let queryStr = JSON.stringify(queryObj);
     queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
-    let query = Product.find(JSON.parse(queryStr));
+    let query = Product.find(JSON.parse(queryStr)).populate({ path: 'location' });
     
     // Sorting
     if (req.query.sort) {
