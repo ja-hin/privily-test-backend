@@ -501,12 +501,6 @@ const createBooking = asyncHandler(async (req, res) => {
     const startTimeObj = new Date(startTime);
     const endTimeObj = new Date(endTime);
 
-    // Convert start and end times to UTC (assuming they are in IST)
-    startTimeObj.setUTCHours(startTimeObj.getUTCHours() - 5);
-    startTimeObj.setUTCMinutes(startTimeObj.getUTCMinutes() - 30);
-    endTimeObj.setUTCHours(endTimeObj.getUTCHours() - 5);
-    endTimeObj.setUTCMinutes(endTimeObj.getUTCMinutes() - 30);
-
     // Check for overlapping bookings
     const existingBooking = await Booking.findOne({
       podId,
@@ -522,11 +516,9 @@ const createBooking = asyncHandler(async (req, res) => {
     }
 
     // Generate QR Code Data String
-    const deviceID = podId.toString();
-    const userID = user._id.toString();
     const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000).toString();
     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000).toString();
-    const qrCodeDataString = `F2/${deviceID}/${userID}/0/${endTimeStamp}/${startTimeStamp}`;
+    const qrCodeDataString = `F2/33346/629039/0/${endTimeStamp}/${startTimeStamp}`;
 
     // Create new booking
     const newBooking = await Booking.create({
@@ -548,12 +540,10 @@ const createBooking = asyncHandler(async (req, res) => {
     const productAvailability = await ProductAvailability.findOne({
       product_id: podId,
       createdAt: {
-        $gte: new Date(Date.UTC(bookingDateObj.getUTCFullYear(), bookingDateObj.getUTCMonth(), bookingDateObj.getUTCDate())),
-        $lt: new Date(Date.UTC(bookingDateObj.getUTCFullYear(), bookingDateObj.getUTCMonth(), bookingDateObj.getUTCDate() + 1))
+        $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
+        $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
       }
     });
-    console.log("check")
-    console.log(productAvailability)
 
     if (productAvailability) {
       // Update slot bookings
@@ -585,8 +575,7 @@ const createBooking = asyncHandler(async (req, res) => {
       };
       await ProductAvailability.create(data);
     }
-
-    sendNotificationOnBooking(user._id, newBooking._id);
+    sendNotificationOnBooking(user, newBooking);
     res.status(201).json({ message: "Booking created successfully", booking: newBooking });
   } catch (error) {
     console.error(error);
@@ -594,14 +583,18 @@ const createBooking = asyncHandler(async (req, res) => {
   }
 });
 
-const sendNotificationOnBooking = asyncHandler(async (userId, bookingId) => {
-  validateMongoDbId(userId);
-  validateMongoDbId(bookingId);
+const sendNotificationOnBooking = asyncHandler(async (user=null, booking, userId=null) => {
+
   try {
-    const user = await User.findById(userId);
+    if (!user && !userId){
+      throw new Error("Any one of User or UserId is required");
+    }
+    if (!user){
+      user = await User.findById(userId);
+    }
     if (!user) throw new Error("User not found");
 
-    const booking = await Booking.findById(bookingId).populate("podId");
+    booking = booking.populate("podId");
     if (!booking) throw new Error("Booking not found");
 
     // Format booking date and times
@@ -630,7 +623,6 @@ const sendNotificationOnBooking = asyncHandler(async (userId, bookingId) => {
       html: emailContent,
     };
     await sendEmail(data.to, data.subject, data.html);
-
     console.log("Email sent successfully.");
   } catch (error) {
     console.error("Error sending notification:", error.message);
@@ -639,10 +631,31 @@ const sendNotificationOnBooking = asyncHandler(async (userId, bookingId) => {
 });
 
 // get all bookings for a user
+// const getBookingsByUser = asyncHandler(async (req, res) => {
+//   const { _id } = req.user;
+//   validateMongoDbId(_id);
+//   try {
+//     const user = await User.findById(_id).populate("booking");
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+//     const bookings = user.booking;
+//     res.json(bookings);
+//   } catch (error) {
+//     console.error("Error fetching bookings by user:", error); // Log the error for debugging
+//     res.status(500).json({
+//       status: "fail",
+//       message: "An error occurred while fetching bookings by user.",
+//     });
+//   }
+// });
 const getBookingsByUser = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
   try {
+    // Call updateBookingStatusAutomatically function
+    await updateBookingStatusAutomatically(req, res, async () => {});
+
     const user = await User.findById(_id).populate("booking");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -658,15 +671,28 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
   }
 });
 
+
 // Get all bookings for admin to manage and update status of booking as per the status
+// const getBookings = asyncHandler(async (req, res) => {
+//   try {
+//     const allBookings = await Booking.find();
+//     res.json(allBookings);
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
 const getBookings = asyncHandler(async (req, res) => {
   try {
+    // Call updateBookingStatusAutomatically function
+    await updateBookingStatusAutomatically(req, res, async () => {});
+
     const allBookings = await Booking.find();
     res.json(allBookings);
   } catch (error) {
     throw new Error(error);
   }
 });
+
 
 // Get a booking by ID for admin to manage and update status of booking as per the status
 const getBookingById = asyncHandler(async (req, res) => {
@@ -868,7 +894,53 @@ const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
 });
 
 //update booking auromatically when current time is equal to or greater than booking start time
-const updateBookingStatusAutomatically = asyncHandler(async (req, res) => {
+// const updateBookingStatusAutomatically = asyncHandler(async (req, res) => {
+//   const { _id } = req.user;
+//   validateMongoDbId(_id);
+
+//   try {
+//     const now = new Date();
+
+//     console.log("Current Time:", now);
+
+//     // Find pending bookings
+//     const pendingBookings = await Booking.find({
+//       user: _id,
+//       isBookingActive: true,
+//       status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] }, // Use $nin operator to exclude multiple statuses
+//       endTime: { $lte: now }, // Find bookings where endTime is less than or equal to now
+//     }).populate("user");
+
+//     // console.log("Pending Bookings:", pendingBookings);
+//     // Update completed bookings status to "Completed"
+//     const updatedCompletedBookings = await Promise.all(
+//       pendingBookings.map(async (booking) => {
+//         console.log(booking.startTime);
+//         console.log(booking.endTime);
+
+//         if (booking.endTime <= now) {
+//           // Use endTime directly for comparison
+//           booking.status = "Completed";
+//         }
+//         if (booking.startTime <= now && now <= booking.endTime) {
+//           // Check if now is within booking's start and end time
+//           booking.status = "Processing";
+//         }
+//         return await booking.save();
+//       })
+//     );
+
+//     // Send the response
+//     res.json({
+//       message: "Booking status updated successfully",
+//       updatedCompletedBookings,
+//     });
+//   } catch (error) {
+//     console.error("Error updating booking status:", error);
+//     res.status(500).json({ message: "Failed to update booking status" });
+//   }
+// });
+const updateBookingStatusAutomatically = async (req, res, next) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
 
@@ -904,16 +976,25 @@ const updateBookingStatusAutomatically = asyncHandler(async (req, res) => {
       })
     );
 
-    // Send the response
-    res.json({
-      message: "Booking status updated successfully",
-      updatedCompletedBookings,
-    });
+    if (next) {
+      next();
+    } else {
+      // Send the response
+      res.json({
+        message: "Booking status updated successfully",
+        updatedCompletedBookings,
+      });
+    }
   } catch (error) {
     console.error("Error updating booking status:", error);
-    res.status(500).json({ message: "Failed to update booking status" });
+    if (next) {
+      next(error);
+    } else {
+      res.status(500).json({ message: "Failed to update booking status" });
+    }
   }
-});
+};
+
 
 // rating a booking after completion of booking by user if status is Completed
 const rateBooking = asyncHandler(async (req, res) => {
