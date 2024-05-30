@@ -24,6 +24,18 @@ var productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    booking_requirements: {
+      type: String,
+      required: true,
+    },
+    cancellation_policy: {
+      type: String,
+      required: true,
+    },
+    availability: {
+      type: String,
+      required: true,
+    },
 
     location: {
       type: mongoose.Schema.Types.ObjectId,
