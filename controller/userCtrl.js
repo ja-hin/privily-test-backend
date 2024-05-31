@@ -545,6 +545,10 @@ const createBooking = asyncHandler(async (req, res) => {
       bookingPurpose,
       status: "Pending",
       qrCodeData: qrCodeDataString,
+      feedback:{
+        "message": null,
+        "rating": null
+      }
     });
 
     user.booking.push(newBooking._id);
