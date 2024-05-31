@@ -1039,10 +1039,8 @@ const rateBooking = asyncHandler(async (req, res) => {
     const product = booking.podId;
     
     const { rating, message } = req.body;
-    booking.podId.feedback = {
-      rating: rating,
-      message: message,
-    };
+    booking.feedback.rating = rating
+    booking.feedback.message = message
     const newRating = {
       star: rating,
       comment: message,
@@ -1056,12 +1054,10 @@ const rateBooking = asyncHandler(async (req, res) => {
     });
     product.ratingCount = product.ratings.length;
     product.totalRating = totalRating / product.ratingCount;
-
     // booking.rating = newRating;
     sendNotification(req, res);
     booking.status = "Rated";
     booking.isBookingActive = false;
-
     await booking.save();
     await product.save();
 

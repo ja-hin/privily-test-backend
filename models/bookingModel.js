@@ -56,11 +56,8 @@ const bookingSchema = new mongoose.Schema(
     },
     feedback: 
     {
-      type: Map,
-      of: new mongoose.Schema({
-          message: String,
-          rating: Number
-      })
+      rating: { type: Number },
+      message: { type: String }
   }
 
     // totalCost: {
