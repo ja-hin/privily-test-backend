@@ -253,8 +253,10 @@ const productAvailability = asyncHandler(async (req, res) => {
     // Fetch a product availability
     const id = req.params.id;
     let product_availability = await ProductAvailability.findOne({product_id: id, createdAt: {
-      $gte: new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())),
-      $lt: new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate() + 1))
+      $gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()),
+      $lt: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1)
+      // $gte: new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())),
+      // $lt: new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate() + 1))
   }}).select('product_id slot_bookings')
     if (!product_availability){
       const indexes = (END_TIME - START_TIME) * 4;
