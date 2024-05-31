@@ -54,12 +54,14 @@ const bookingSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    feedback: [
-      {
-        rating: Number,
-        message: String,
-      }
-    ],
+    feedback: 
+    {
+      type: Map,
+      of: new mongoose.Schema({
+          message: String,
+          rating: Number
+      })
+  }
 
     // totalCost: {
     //   type: Number,

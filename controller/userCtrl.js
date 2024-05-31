@@ -972,7 +972,6 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
       endTime: { $lte: now }, // Find bookings where endTime is less than or equal to now
     }).populate("user");
 
-    // console.log("Pending Bookings:", pendingBookings);
     // Update completed bookings status to "Completed"
     const updatedCompletedBookings = await Promise.all(
       pendingBookings.map(async (booking) => {
@@ -1020,7 +1019,7 @@ const rateBooking = asyncHandler(async (req, res) => {
       .populate("user")
       .populate("podId")
       .exec();
-
+    console.log(booking)
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
@@ -1031,29 +1030,38 @@ const rateBooking = asyncHandler(async (req, res) => {
     } else if (booking.isBookingActive === false) {
       return res.status(400).json({ message: "Booking is already rated." });
     }
-    const { rating, comments } = req.body;
+
+    
+    const product = booking.podId;
+    
+    const { rating, message } = req.body;
+    booking.podId.feedback = {
+      rating: rating,
+      message: message,
+    };
     const newRating = {
       star: rating,
-      comment: comments,
+      comment: message,
       postedby: booking.user._id,
     };
-    booking.podId.ratings.push(newRating);
+    product.ratings.push(newRating);
 
     let totalRating = 0;
-    booking.podId.ratings.forEach((rating) => {
+    product.ratings.forEach((rating) => {
       totalRating += rating.star;
     });
-    booking.podId.ratingCount = booking.podId.ratings.length;
-    booking.podId.totalRating = totalRating / booking.podId.ratingCount;
+    product.ratingCount = product.ratings.length;
+    product.totalRating = totalRating / product.ratingCount;
 
-    booking.rating = newRating;
-    sendNotification();
+    // booking.rating = newRating;
+    sendNotification(req, res);
     booking.status = "Rated";
     booking.isBookingActive = false;
 
     await booking.save();
+    await product.save();
 
-    res.json(booking);
+    res.json({"message":"Successfully Rated"});
   } catch (error) {
     throw new Error(error);
   }
@@ -1125,6 +1133,25 @@ const sendNotification = asyncHandler(async (req, res) => {
   }
 });
 
+const getAllNotification = asyncHandler(async (req, res) => {
+  const user = req.user;
+  await updateBookingStatusAutomatically(req, res, async () => {});
+  const bookings = await Booking.find({ user: user._id,
+    status: "Completed"})
+  result = {data:[]}
+  bookings.forEach(booking => {
+    result['data'].push({
+      'message': 'This is regarding your last booking on '+booking.bookingDate.toString(),
+      'booking_id': booking._id,
+      'icon': 'icon to send',
+      'type': 'Rating' // as per this type, frontend will redirect to feedback mark page.
+    })
+  })
+  res.json(result)
+  })
+
+
+
 module.exports = {
   createUser,
   loginUserCtrl,
@@ -1156,4 +1183,5 @@ module.exports = {
   sendNotification,
   rateBooking,
   bookingFeedback,
+  getAllNotification,
 };

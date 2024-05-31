@@ -28,6 +28,7 @@ const {
   updateBookingStatusByAdmin,
   setCurrentLocation,
   sendNotification,
+  getAllNotification,
   rateBooking,
   loginMobileUserCtrl,
   verifyMobileOtp,
@@ -86,6 +87,7 @@ router.put(
 
 router.post("/rate-booking/:id", authMiddleware, rateBooking);
 
-router.put("/notification", authMiddleware, sendNotification);
+router.get("/notifications/active", authMiddleware, getAllNotification);
+router.put("/notification/send", authMiddleware, sendNotification);
 
 module.exports = router;
