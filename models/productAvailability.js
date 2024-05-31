@@ -11,6 +11,10 @@ const bookingSchema = new mongoose.Schema(
         type: [Boolean], // Array of Booleans
         required: true,
     },
+    booking_date: {
+      type: Date,
+      require: true,
+    },
     // available_slots: {
     // type: [Number], // Array of Numbers (integers)
     // required: true,

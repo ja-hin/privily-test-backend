@@ -13,6 +13,7 @@ const {
 const { isAdmin, authMiddleware } = require("../middlew/authMIddleware");
 const router = express.Router();
 
+router.get("/availability/:id", productAvailability);
 router.post("/create-pods", createProduct);
 router.get("/", getAllProducts);
 router.get("/filter", getAllProductUsingFilter);
@@ -21,7 +22,7 @@ router.get("/address", getAllProductAddress);
 router.get("/:id", getaProduct);
 router.put("/:id", authMiddleware, isAdmin, updateProduct);
 router.delete("/:id", authMiddleware, isAdmin, deleteProduct);
-router.get("/availability/:id", productAvailability);
+
 
 
 module.exports = router;

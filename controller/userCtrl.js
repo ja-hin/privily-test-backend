@@ -534,7 +534,6 @@ const createBooking = asyncHandler(async (req, res) => {
     const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000).toString();
     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000).toString();
     const qrCodeDataString = `F2/33346/629039/0/${endTimeStamp}/${startTimeStamp}`;
-
     // Create new booking
     const newBooking = await Booking.create({
       user: user._id,
@@ -554,7 +553,7 @@ const createBooking = asyncHandler(async (req, res) => {
     // Create or update product availability entry
     const productAvailability = await ProductAvailability.findOne({
       product_id: podId,
-      createdAt: {
+      booking_date: {
         $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
         $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
       }
@@ -587,6 +586,7 @@ const createBooking = asyncHandler(async (req, res) => {
       const data = {
         product_id: podId,
         slot_bookings: slotBookings,
+        booking_date: bookingDateObj,
       };
       await ProductAvailability.create(data);
     }
