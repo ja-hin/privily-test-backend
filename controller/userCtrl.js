@@ -11,6 +11,7 @@ const twilio = require("twilio");
 const MobileUserModel = require("../models/mobileUserModel");
 const ProductAvailability = require("../models/productAvailability");
 const { START_TIME, END_TIME } = require('./constants');
+const Corporate = require('../models/corporateModel');
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -454,6 +455,30 @@ const resetPassword = asyncHandler(async (req, res) => {
   user.passwordResetExpires = undefined;
   await user.save();
   res.json(user);
+});
+
+//Get data for corporate pods
+const corporatePods = asyncHandler(async (req, res) => {
+  const { companyName, email, mobile } = req.body;
+
+  const corporate = new Corporate({
+      companyName,
+      email,
+      mobile
+  });
+
+  // Save the data to the database
+  const savedData = await corporate.save();
+
+  res.status(201).json({
+      message: 'Thanks for your Query',
+      corporate: {
+          _id: savedData._id,
+          companyName: savedData.companyName,
+          email: savedData.email,
+          mobile: savedData.mobile
+      }
+  });
 });
 
 // Apply Coupon on booking total amount
@@ -1187,5 +1212,6 @@ module.exports = {
   sendNotification,
   rateBooking,
   bookingFeedback,
+  corporatePods,
   getAllNotification,
 };
