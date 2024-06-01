@@ -20,17 +20,51 @@ const twilioClient = twilio(
 );
 
 // Create a User
-const createUser = asyncHandler(async (req, res) => {
-  const email = req.body.email;
-  const findUser = await User.findOne({ email: email });
+// const createUser = asyncHandler(async (req, res) => {
+//   const email = req.body.email;
+//   const findUser = await User.findOne({ email: email });
 
-  if (!findUser) {
-    const newUser = await User.create(req.body);
-    res.json(newUser);
-  } else {
-    throw new Error("User Already Exists");
+//   if (!findUser) {
+//     const newUser = await User.create(req.body);
+//     res.json(newUser);
+//   } else {
+//     throw new Error("User Already Exists");
+//   }
+// });
+const createUser = asyncHandler(async (req, res) => {
+  const { email, phoneNumber, firstname, lastname } = req.body;
+
+  if (!email || !phoneNumber || !firstname || !lastname) {
+    return res.status(400).send("All fields are required");
+  }
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return res.status(400).send("User already exists");
+  }
+
+  try {
+    const newUser = new User({
+      email,
+      mobile: phoneNumber,
+      firstname,
+      lastname,
+      // password field is not included
+    });
+    await newUser.save();
+
+    const token = generateToken(newUser._id);
+    res.json({
+      message: "User registered successfully",
+      token,
+      userId: newUser._id,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Failed to register user");
   }
 });
+
 
 // Login a user
 const loginUserCtrl = asyncHandler(async (req, res) => {
@@ -103,6 +137,52 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
 //     res.status(500).send("Failed to send OTP");
 //   }
 // });
+// const loginMobileUserCtrl = asyncHandler(async (req, res) => {
+//   const { phoneNumber } = req.body;
+//   if (!phoneNumber) {
+//     return res.status(400).send("Phone number is required");
+//   }
+
+//   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+//   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
+
+//   try {
+//     let mobileUser = await MobileUserModel.findOne({ phoneNumber });
+//     if (!mobileUser) {
+//       mobileUser = new MobileUserModel({ phoneNumber });
+//     }
+
+//     mobileUser.otp = otp;
+//     mobileUser.otpExpires = otpExpires;
+//     await mobileUser.save();
+
+//     await twilioClient.messages.create({
+//       body: `Your OTP is ${otp}`,
+//       from: process.env.TWILIO_PHONE_NUMBER,
+//       to: phoneNumber,
+//     });
+
+//     // res.send("OTP sent successfully");
+
+
+//     const refreshToken = await generateRefreshToken(mobileUser?.user?._id);
+//     const updateuser = await User.findByIdAndUpdate(
+//       mobileUser?.user?.id,
+//       {
+//         refreshToken: refreshToken,
+//       },
+//       { new: true }
+//     );
+//     res.cookie("refreshToken", refreshToken, {
+//       httpOnly: true,
+//       maxAge: 72 * 60 * 60 * 1000,
+//     });
+//     res.json({token: generateToken(mobileUser?.user?._id)})
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).send("Failed to send OTP");
+//   }
+// });
 const loginMobileUserCtrl = asyncHandler(async (req, res) => {
   const { phoneNumber } = req.body;
   if (!phoneNumber) {
@@ -128,27 +208,13 @@ const loginMobileUserCtrl = asyncHandler(async (req, res) => {
       to: phoneNumber,
     });
 
-    // res.send("OTP sent successfully");
-
-
-    const refreshToken = await generateRefreshToken(mobileUser?.user?._id);
-    const updateuser = await User.findByIdAndUpdate(
-      mobileUser?.user?.id,
-      {
-        refreshToken: refreshToken,
-      },
-      { new: true }
-    );
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      maxAge: 72 * 60 * 60 * 1000,
-    });
-    res.json({token: generateToken(mobileUser?.user?._id)})
+    res.send("OTP sent successfully");
   } catch (error) {
     console.error(error);
     res.status(500).send("Failed to send OTP");
   }
 });
+
 
 // admin login
 const loginAdmin = asyncHandler(async (req, res) => {
@@ -181,28 +247,66 @@ const loginAdmin = asyncHandler(async (req, res) => {
   }
 });
 
+// const verifyMobileOtp = asyncHandler(async (req, res) => {
+//   const { phoneNumber, otp } = req.body;
+//   console.log(phoneNumber, otp, "otp")
+//   if (!phoneNumber || !otp) {
+//     return res.status(400).send("Phone number and OTP are required");
+//   }
+
+//   try {
+//     const user = await MobileUserModel.findOne({ phoneNumber });
+//     if (!user) {
+//       return res.status(400).send("User not found");
+//     }
+
+//     if (user.otp !== otp || new Date() > user.otpExpires) {
+//       return res.status(400).send("Invalid or expired OTP");
+//     }
+
+//     user.otp = null;
+//     user.otpExpires = null;
+//     await user.save();
+
+//     res.send("OTP verified successfully");
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).send("Failed to verify OTP");
+//   }
+// });
 const verifyMobileOtp = asyncHandler(async (req, res) => {
   const { phoneNumber, otp } = req.body;
-  console.log(phoneNumber, otp, "otp")
   if (!phoneNumber || !otp) {
     return res.status(400).send("Phone number and OTP are required");
   }
 
   try {
-    const user = await MobileUserModel.findOne({ phoneNumber });
-    if (!user) {
+    const mobileUser = await MobileUserModel.findOne({ phoneNumber });
+    if (!mobileUser) {
       return res.status(400).send("User not found");
     }
 
-    if (user.otp !== otp || new Date() > user.otpExpires) {
+    if (mobileUser.otp !== otp || new Date() > mobileUser.otpExpires) {
       return res.status(400).send("Invalid or expired OTP");
     }
 
-    user.otp = null;
-    user.otpExpires = null;
-    await user.save();
+    mobileUser.otp = null;
+    mobileUser.otpExpires = null;
+    await mobileUser.save();
 
-    res.send("OTP verified successfully");
+    const existingUser = await User.findOne({ mobile: phoneNumber });
+
+    if (existingUser) {
+      const token = generateToken(existingUser._id);
+      res.json({
+        message: "OTP verified successfully",
+        status: 0,
+        token,
+        userId: existingUser._id,
+      });
+    } else {
+      res.json({ message: "OTP verified successfully", status: 1 });
+    }
   } catch (error) {
     console.error(error);
     res.status(500).send("Failed to verify OTP");
