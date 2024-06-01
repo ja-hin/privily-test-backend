@@ -12,6 +12,7 @@ const MobileUserModel = require("../models/mobileUserModel");
 const ProductAvailability = require("../models/productAvailability");
 const { START_TIME, END_TIME } = require('./constants');
 const Corporate = require('../models/corporateModel');
+const moment = require('moment-timezone');
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -516,6 +517,7 @@ const corporatePods = asyncHandler(async (req, res) => {
 // }
 // ProductAvailability.create(data);
 
+// Function to get slot index from time
 function get_slot_index_from_time(time_obj, start_time) {
   const hours = time_obj.getHours();
   const minutes = time_obj.getMinutes();
@@ -536,10 +538,10 @@ const createBooking = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Convert bookingDate, startTime, and endTime to Date objects
-    const bookingDateObj = new Date(bookingDate);
-    const startTimeObj = new Date(startTime);
-    const endTimeObj = new Date(endTime);
+    // Convert bookingDate, startTime, and endTime to Date objects in IST
+    const bookingDateObj = moment.tz(bookingDate, "Asia/Kolkata").toDate();
+    const startTimeObj = moment.tz(startTime, "Asia/Kolkata").toDate();
+    const endTimeObj = moment.tz(endTime, "Asia/Kolkata").toDate();
 
     // Check for overlapping bookings
     const existingBooking = await Booking.findOne({
@@ -559,6 +561,7 @@ const createBooking = asyncHandler(async (req, res) => {
     const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000).toString();
     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000).toString();
     const qrCodeDataString = `F2/33346/629039/0/${endTimeStamp}/${startTimeStamp}`;
+
     // Create new booking
     const newBooking = await Booking.create({
       user: user._id,
@@ -570,9 +573,9 @@ const createBooking = asyncHandler(async (req, res) => {
       bookingPurpose,
       status: "Pending",
       qrCodeData: qrCodeDataString,
-      feedback:{
-        "message": null,
-        "rating": null
+      feedback: {
+        message: null,
+        rating: null
       }
     });
 
@@ -590,7 +593,6 @@ const createBooking = asyncHandler(async (req, res) => {
 
     if (productAvailability) {
       // Update slot bookings
-      console.log("Enter Product availibility")
       let updatedSlotBookings = productAvailability.slot_bookings;
       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
@@ -619,21 +621,29 @@ const createBooking = asyncHandler(async (req, res) => {
       };
       await ProductAvailability.create(data);
     }
+    
+    // Convert the new booking times to IST for the response
+    const responseBooking = {
+      ...newBooking._doc,
+      bookingDate: moment(newBooking.bookingDate).tz("Asia/Kolkata").format(),
+      startTime: moment(newBooking.startTime).tz("Asia/Kolkata").format(),
+      endTime: moment(newBooking.endTime).tz("Asia/Kolkata").format(),
+    };
+
     sendNotificationOnBooking(user, newBooking);
-    res.status(201).json({ message: "Booking created successfully", booking: newBooking });
+    res.status(201).json({ message: "Booking created successfully", booking: responseBooking });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-const sendNotificationOnBooking = asyncHandler(async (user=null, booking, userId=null) => {
-
+const sendNotificationOnBooking = asyncHandler(async (user = null, booking, userId = null) => {
   try {
-    if (!user && !userId){
+    if (!user && !userId) {
       throw new Error("Any one of User or UserId is required");
     }
-    if (!user){
+    if (!user) {
       user = await User.findById(userId);
     }
     if (!user) throw new Error("User not found");
@@ -643,8 +653,8 @@ const sendNotificationOnBooking = asyncHandler(async (user=null, booking, userId
 
     // Format booking date and times
     const formattedBookingDate = booking.bookingDate.toDateString();
-    const formattedStartTime = booking.startTime.toLocaleTimeString("en-US", { hour12: true });
-    const formattedEndTime = booking.endTime.toLocaleTimeString("en-US", { hour12: true });
+    const formattedStartTime = moment(booking.startTime).tz("Asia/Kolkata").format("hh:mm A");
+    const formattedEndTime = moment(booking.endTime).tz("Asia/Kolkata").format("hh:mm A");
 
     // Construct email content
     const emailContent = `
@@ -655,7 +665,7 @@ const sendNotificationOnBooking = asyncHandler(async (user=null, booking, userId
         <li><strong>Booking Date:</strong> ${formattedBookingDate}</li>
         <li><strong>Start Time:</strong> ${formattedStartTime}</li>
         <li><strong>End Time:</strong> ${formattedEndTime}</li>
-        <li><strong>Pod ID:</strong> ${booking.podId.name}</li>
+        <li><strong>Pod ID:</strong> ${booking.podId}</li>
       </ul>
       <p>Thank you for booking with us!</p>
     `;
