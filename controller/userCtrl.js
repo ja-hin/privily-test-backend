@@ -651,12 +651,28 @@ const createBooking = asyncHandler(async (req, res) => {
     const existingBooking = await Booking.findOne({
       podId,
       $or: [
-        { startTime: { $lte: startTimeObj }, endTime: { $gte: startTimeObj } },
-        { startTime: { $lte: endTimeObj }, endTime: { $gte: endTimeObj } },
-        { startTime: { $gte: startTimeObj }, endTime: { $lte: endTimeObj } }
-      ]
+        {
+          $and: [
+            { startTime: { $lte: startTimeObj } },
+            { endTime: { $gte: endTimeObj } },
+          ],
+        }, // Check if new booking starts during existing booking
+        {
+          $and: [
+            { startTime: { $lte: endTimeObj } },
+            { endTime: { $gte: endTimeObj } },
+          ],
+        }, // Check if new booking ends during existing booking
+        {
+          $and: [
+            { startTime: { $gte: startTimeObj } },
+            { endTime: { $lte: endTimeObj } },
+          ],
+        }, // Check if new booking is completely within existing booking
+      ],
     });
-
+    console.log("existingBooking")
+    console.log(existingBooking)
     if (existingBooking) {
       return res.status(400).json({ message: "Booking with the same date and time already exists" });
     }
@@ -700,13 +716,11 @@ const createBooking = asyncHandler(async (req, res) => {
       let updatedSlotBookings = productAvailability.slot_bookings;
       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
-
       for (let i = startingIndex; i < endingIndex; i++) {
         updatedSlotBookings[i] = true;
-      }
+      }      
 
-      productAvailability.slot_bookings = updatedSlotBookings;
-      await productAvailability.save();
+      await ProductAvailability.findOneAndUpdate({_id:productAvailability._id}, {slot_bookings: updatedSlotBookings}, { new: true });
     } else {
       // Create new product availability entry
       const indexes = (END_TIME - START_TIME) * 4;

@@ -6,6 +6,7 @@ const asyncHandler = require("express-async-handler");
 const slugify = require("slugify");
 const validateMongoDbId = require("../utils/validateMongodbId");
 const { START_TIME, END_TIME } = require('./constants');
+const moment = require('moment-timezone');
 
 // create a pod with details
 const createProduct = asyncHandler(async (req, res) => {
@@ -246,26 +247,34 @@ const getAllProductAddress = asyncHandler(async (req, res) => {
 
 const productAvailability = asyncHandler(async (req, res) => {
   try {
-    if (!req?.query?.booking_date){
-      res.status(500).json({ message: "Please provide a Booking Date" });
+    if (!req?.query?.booking_date) {
+      return res.status(400).json({ message: "Please provide a Booking Date" });
     }
-    targetDate = new Date(req.query.booking_date);
+
+    const targetDate = moment.tz(req.query.booking_date, "Asia/Kolkata");
+    
     // Fetch a product availability
     const id = req.params.id;
     
-    let product_availability = await ProductAvailability.findOne({product_id: id, booking_date: {
-      $gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()),
-      $lt: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()+1)
-      // $gte: new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())),
-      // $lt: new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate() + 1))
-  }}).select('product_id slot_bookings')
-    if (!product_availability){
+    let product_availability = await ProductAvailability.findOne({
+      product_id: id,
+      booking_date: {
+        $gte: targetDate.startOf('day').toDate(),
+        $lt: targetDate.endOf('day').toDate()
+      }
+    }).select('product_id slot_bookings');
+
+    if (!product_availability) {
       const indexes = (END_TIME - START_TIME) * 4;
       const slotBookings = Array.from({ length: indexes }, () => false);
-      product_availability = new ProductAvailability({product_id: id, slot_bookings:slotBookings})
+      product_availability = new ProductAvailability({
+        product_id: id,
+        slot_bookings: slotBookings,
+        booking_date: targetDate.toDate()
+      });
     }
     
-    res.json({product_availability, 'start_time': START_TIME, 'end_time': END_TIME});
+    res.json({ product_availability, 'start_time': START_TIME, 'end_time': END_TIME });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server Error" });
