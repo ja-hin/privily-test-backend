@@ -562,6 +562,11 @@ const resetPassword = asyncHandler(async (req, res) => {
   res.json(user);
 });
 
+//get data of logged user
+const getMe = async (req, res) => {
+  res.json(req.user);
+};
+
 //Get data for corporate pods
 const corporatePods = asyncHandler(async (req, res) => {
   const { companyName, email, mobile } = req.body;
@@ -1338,4 +1343,5 @@ module.exports = {
   bookingFeedback,
   corporatePods,
   getAllNotification,
+  getMe,
 };

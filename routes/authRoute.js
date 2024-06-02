@@ -34,6 +34,7 @@ const {
   verifyMobileOtp,
   bookingFeedback,
   corporatePods,
+  getMe,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -42,6 +43,7 @@ const router = express.Router();
 
 router.post("/register", createUser);
 router.post("/login", loginUserCtrl);
+router.get('/me', authMiddleware, getMe);
 router.post("/app-login", loginMobileUserCtrl);
 router.post("/verify-otp", verifyMobileOtp);
 router.get("/logout", logout);
