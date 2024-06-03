@@ -666,16 +666,19 @@ const createBooking = asyncHandler(async (req, res) => {
         }, // Check if new booking is completely within existing booking
       ],
     });
-    console.log("existingBooking")
-    console.log(existingBooking)
     if (existingBooking) {
       return res.status(400).json({ message: "Booking with the same date and time already exists" });
     }
 
     // Generate QR Code Data String
-    const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000).toString();
-    const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000).toString();
-    const qrCodeDataString = `F2/33346/629039/0/${endTimeStamp}/${startTimeStamp}`;
+    const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000);
+    const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000);
+ 
+    // Calculate IST Unix timestamps by adding the offset (19800 seconds)
+    const IST_OFFSET_SECONDS = 19800; // 5 hours and 30 minutes in seconds
+    const startTimeIST = startTimeStamp + IST_OFFSET_SECONDS;
+    const endTimeIST = endTimeStamp + IST_OFFSET_SECONDS;
+    const qrCodeDataString = `F2/33346/629039/0/${endTimeIST}/${startTimeIST}`;
 
     // Create new booking
     const newBooking = await Booking.create({
