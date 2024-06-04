@@ -35,6 +35,7 @@ const {
   bookingFeedback,
   corporatePods,
   getMe,
+  extendBooking,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -74,6 +75,7 @@ router.put("/cancel-booking/:id", authMiddleware, cancelBooking);
 router.put("/feedback/:id", authMiddleware, bookingFeedback);
 router.get("/:id", authMiddleware, isAdmin, getaUser);
 router.post("/corporate-pods", corporatePods);
+router.post('/extend/:bookingId', authMiddleware, extendBooking);
 
 
 router.put(

@@ -800,6 +800,80 @@ const sendNotificationOnBooking = asyncHandler(async (user = null, booking, user
   }
 });
 
+//extend booking time
+const extendBooking = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { extensionMinutes } = req.body; // Expecting the requested extension time in minutes
+
+  validateMongoDbId(bookingId);
+
+  try {
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    const podId = booking.podId;
+    const endTimeObj = new Date(booking.endTime);
+
+    // Fetch ProductAvailability for the given date
+    const bookingDateObj = new Date(booking.bookingDate);
+    let productAvailability = await ProductAvailability.findOne({
+      product_id: podId,
+      booking_date: {
+        $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
+        $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
+      }
+    });
+
+    if (!productAvailability) {
+      const indexes = (END_TIME - START_TIME) * 4;
+      const slotBookings = Array.from({ length: indexes }, () => false);
+      productAvailability = new ProductAvailability({
+        product_id: podId,
+        slot_bookings: slotBookings,
+        booking_date: bookingDateObj
+      });
+      await productAvailability.save();
+    }
+
+    // Calculate the new end time
+    const newEndTimeObj = new Date(endTimeObj.getTime() + extensionMinutes * 60000);
+    const currentEndingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+    const newEndingIndex = get_slot_index_from_time(newEndTimeObj, START_TIME);
+
+    // Update slot bookings in ProductAvailability
+    const slotBookings = productAvailability.slot_bookings;
+    for (let i = currentEndingIndex; i < newEndingIndex; i++) {
+      if (slotBookings[i]) {
+        return res.status(400).json({ message: "Slot not available for the requested extension time." });
+      }
+      slotBookings[i] = true;
+    }
+
+    await ProductAvailability.findOneAndUpdate({ _id: productAvailability._id }, { slot_bookings: slotBookings }, { new: true });
+
+    // Update booking endTime
+    booking.endTime = newEndTimeObj;
+    booking.qrCodeData = `F2/33346/629039/0/${Math.floor(newEndTimeObj.getTime() / 1000)}/${Math.floor(new Date(booking.startTime).getTime() / 1000)}`;
+    await booking.save();
+
+    // Convert the updated booking times to IST for the response
+    const responseBooking = {
+      ...booking._doc,
+      bookingDate: moment(booking.bookingDate).tz("Asia/Kolkata").format(),
+      startTime: moment(booking.startTime).tz("Asia/Kolkata").format(),
+      endTime: moment(booking.endTime).tz("Asia/Kolkata").format(),
+    };
+
+    return res.status(200).json({ message: "Booking extended successfully", booking: responseBooking });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+
 // get all bookings for a user
 // const getBookingsByUser = asyncHandler(async (req, res) => {
 //   const { _id } = req.user;
@@ -1337,4 +1411,5 @@ module.exports = {
   corporatePods,
   getAllNotification,
   getMe,
+  extendBooking,
 };
