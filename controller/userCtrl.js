@@ -630,7 +630,7 @@ const createBooking = asyncHandler(async (req, res) => {
   validateMongoDbId(_id);
   validateMongoDbId(podId);
   try {
-    const { bookingDate, startTime, endTime, timeSlotNumber, bookingPurpose } = req.body;
+    const { bookingDate, startTime, endTime, timeSlotNumber, bookingPurpose, description } = req.body;
 
     const user = await User.findById(_id);
     if (!user) {
@@ -645,6 +645,7 @@ const createBooking = asyncHandler(async (req, res) => {
     // Check for overlapping bookings
     const existingBooking = await Booking.findOne({
       podId,
+      status: { $ne: 'Cancelled' }, 
       $or: [
         {
           $and: [
@@ -689,11 +690,12 @@ const createBooking = asyncHandler(async (req, res) => {
       endTime: endTimeObj,
       timeSlotNumber,
       bookingPurpose,
+      description: description || null ,
       status: "Pending",
       qrCodeData: qrCodeDataString,
       feedback: {
-        message: null,
-        rating: null
+        message:null,
+        rating: null,
       }
     });
 
@@ -1039,13 +1041,11 @@ const cancelBooking = asyncHandler(async (req, res) => {
     }
     if (booking.status !== "Pending" && booking.status !== "Confirmed") {
       return res.status(403).json({
-        message:
-          "Cannot cancel booking with status other than Pending or Confirmed",
+        message: "Cannot cancel booking with status other than Pending or Confirmed",
       });
     }
     // Check if booking's start time is within the last 5 minutes
     const fiveMinutesAgo = new Date(new Date() - 300 * 1000);
-
     if (booking.startTime < fiveMinutesAgo) {
       return res.status(403).json({
         message: "Cannot cancel booking Before 5 Minutes of start time",
@@ -1058,26 +1058,83 @@ const cancelBooking = asyncHandler(async (req, res) => {
     booking.isBookingActive = false;
     await booking.save();
 
+    // Update product availability
+    const productAvailability = await ProductAvailability.findOne({
+      product_id: booking.podId,
+      booking_date: {
+        $gte: new Date(booking.bookingDate.getFullYear(), booking.bookingDate.getMonth(), booking.bookingDate.getDate()),
+        $lt: new Date(booking.bookingDate.getFullYear(), booking.bookingDate.getMonth(), booking.bookingDate.getDate() + 1)
+      }
+    });
+
+    if (productAvailability) {
+      let updatedSlotBookings = productAvailability.slot_bookings;
+      const startingIndex = get_slot_index_from_time(booking.startTime, START_TIME);
+      const endingIndex = get_slot_index_from_time(booking.endTime, START_TIME);
+      for (let i = startingIndex; i < endingIndex; i++) {
+        updatedSlotBookings[i] = false;
+      }
+
+      await ProductAvailability.findOneAndUpdate({_id: productAvailability._id}, {slot_bookings: updatedSlotBookings}, { new: true });
+    }
+
     res.json({ message: "Booking cancelled successfully", booking });
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
-const bookingFeedback =  asyncHandler(async (req, res) => {
-  try{
-    booking_id = req.params.id;
-    message = req.body.message
-    rating = req.body.rating
-    const booking = await Booking.findById(booking_id);
+
+// const cancelBooking = asyncHandler(async (req, res) => {
+//   const { id } = req.params;
+//   validateMongoDbId(id);
+//   try {
+//     const booking = await Booking.findById(id);
+
+//     if (!booking) {
+//       return res.status(404).json({ message: "Booking not found" });
+//     }
+//     if (booking.status !== "Pending" && booking.status !== "Confirmed") {
+//       return res.status(403).json({
+//         message:
+//           "Cannot cancel booking with status other than Pending or Confirmed",
+//       });
+//     }
+//     // Check if booking's start time is within the last 5 minutes
+//     const fiveMinutesAgo = new Date(new Date() - 300 * 1000);
+//     console.log(fiveMinutesAgo, 'timing')
+//     console.log(booking.startTime, "start Time")
+//     if (booking.startTime < fiveMinutesAgo) {
+//       return res.status(403).json({
+//         message: "Cannot cancel booking Before 5 Minutes of start time",
+//       });
+//     }
+
+//     // If status is pending or confirmed, update status to "Cancelled"
+//     booking.status = "Cancelled";
+//     sendNotificationOnCancel(booking.user._id, booking._id);
+//     booking.isBookingActive = false;
+//     await booking.save();
+
+//     res.json({ message: "Booking cancelled successfully", booking });
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
+
+const bookingFeedback = asyncHandler(async (req, res) => {
+  try {
+    const booking_id = req.params.id;
+    const { message, rating } = req.body;
+    await Booking.findById(booking_id);
     const updatedBooking = await Booking.findByIdAndUpdate(booking_id, { 'feedback.rating': rating, 'feedback.message': message }, {
       new: true,
     });
-    res.json(updatedBooking)
+    res.json(updatedBooking);
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
-})
+});
 
 const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
   validateMongoDbId(userId);
@@ -1193,27 +1250,23 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
 
     console.log("Current Time:", now);
 
-    // Find pending bookings
-    const pendingBookings = await Booking.find({
+    // Find all active bookings
+    const bookings = await Booking.find({
       user: _id,
       isBookingActive: true,
-      status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] }, // Use $nin operator to exclude multiple statuses
-      endTime: { $lte: now }, // Find bookings where endTime is less than or equal to now
+      status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] },
     }).populate("user");
 
-    // Update completed bookings status to "Completed"
-    const updatedCompletedBookings = await Promise.all(
-      pendingBookings.map(async (booking) => {
-        console.log(booking.startTime);
-        console.log(booking.endTime);
-
-        if (booking.endTime <= now) {
-          // Use endTime directly for comparison
-          booking.status = "Completed";
-        }
-        if (booking.startTime <= now && now <= booking.endTime) {
+    // Update booking statuses
+    const updatedBookings = await Promise.all(
+      bookings.map(async (booking) => {
+        if (booking.startTime <= now && now < booking.endTime) {
           // Check if now is within booking's start and end time
           booking.status = "Processing";
+        } else if (now >= booking.endTime) {
+          // Check if now is past the booking's end time
+          booking.status = "Completed";
+          booking.isBookingActive = false; // Mark booking as inactive
         }
         return await booking.save();
       })
@@ -1225,7 +1278,7 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
       // Send the response
       res.json({
         message: "Booking status updated successfully",
-        updatedCompletedBookings,
+        updatedBookings,
       });
     }
   } catch (error) {
@@ -1248,7 +1301,6 @@ const rateBooking = asyncHandler(async (req, res) => {
       .populate("user")
       .populate("podId")
       .exec();
-    console.log(booking)
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
@@ -1260,12 +1312,22 @@ const rateBooking = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: "Booking is already rated." });
     }
 
-    
     const product = booking.podId;
-    
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
     const { rating, message } = req.body;
-    booking.feedback.rating = rating
-    booking.feedback.message = message
+    booking.feedback = {
+      rating,
+      message,
+    };
+    
+    if (!product.ratings) {
+      product.ratings = [];
+    }
+
     const newRating = {
       star: rating,
       comment: message,
@@ -1279,16 +1341,18 @@ const rateBooking = asyncHandler(async (req, res) => {
     });
     product.ratingCount = product.ratings.length;
     product.totalRating = totalRating / product.ratingCount;
-    // booking.rating = newRating;
+
+    // Notify the user about the rating
     sendNotification(req, res);
+
     booking.status = "Rated";
     booking.isBookingActive = false;
     await booking.save();
     await product.save();
 
-    res.json({"message":"Successfully Rated"});
+    res.json({ message: "Successfully Rated" });
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
 });
 
