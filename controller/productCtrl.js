@@ -89,7 +89,11 @@ const getaProduct = asyncHandler(async (req, res) => {
 // get all pod details
 const getAllProducts = asyncHandler(async (req, res) => {
   try {
-    const products = await Product.find().populate({ path: 'location' });;
+    filter = {}
+    if (req?.query?.isAvailable){
+      filter['isAvailable'] = Boolean(req.query.isAvailable)
+    }
+    const products = await Product.find(filter).populate({ path: 'location' });;
     res.json(products);
   } catch (error) {
     throw new Error(error);
