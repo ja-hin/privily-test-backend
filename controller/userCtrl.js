@@ -285,8 +285,12 @@ const verifyMobileOtp = asyncHandler(async (req, res) => {
     await mobileUser.save();
 
     const existingUser = await User.findOne({ mobile: phoneNumber });
-
+    console.log("existingUser")
+    console.log(existingUser)
     if (existingUser) {
+      if (existingUser.isBlocked) {
+        return res.status(403).json({ message: "User is blocked" });
+      }
       const token = generateToken(existingUser._id);
       res.json({
         message: "OTP verified successfully",
@@ -464,38 +468,33 @@ const blockUser = asyncHandler(async (req, res) => {
   try {
     const blockusr = await User.findByIdAndUpdate(
       id,
-      {
-        isBlocked: true,
-      },
-      {
-        new: true,
-      }
+      { isBlocked: true },
+      { new: true }
     );
-    res.json(blockusr);
+    if (!blockusr) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User blocked successfully" });
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
 });
 
-//unblock a user
 const unblockUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
   try {
     const unblock = await User.findByIdAndUpdate(
       id,
-      {
-        isBlocked: false,
-      },
-      {
-        new: true,
-      }
+      { isBlocked: false },
+      { new: true }
     );
-    res.json({
-      message: "User UnBlocked",
-    });
+    if (!unblock) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User unblocked successfully" });
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
 });
 
