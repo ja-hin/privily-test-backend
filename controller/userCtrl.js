@@ -13,6 +13,7 @@ const ProductAvailability = require("../models/productAvailability");
 const { START_TIME, END_TIME } = require('./constants');
 const Corporate = require('../models/corporateModel');
 const moment = require('moment-timezone');
+const productModel = require("../models/productModel");
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -462,20 +463,41 @@ const deleteaUser = asyncHandler(async (req, res) => {
 });
 
 //block a user
+// const blockUser = asyncHandler(async (req, res) => {
+//   const { id } = req.params;
+//   validateMongoDbId(id);
+//   try {
+//     const blockusr = await User.findByIdAndUpdate(
+//       id,
+//       { isBlocked: true },
+//       { new: true }
+//     );
+//     if (!blockusr) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+//     res.json({ message: "User blocked successfully" });
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// });
 const blockUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  validateMongoDbId(id);
+
+  validateMongoDbId(id); // Make sure this function is correctly implemented
+
   try {
     const blockusr = await User.findByIdAndUpdate(
       id,
       { isBlocked: true },
       { new: true }
     );
+
     if (!blockusr) {
       return res.status(404).json({ message: "User not found" });
     }
     res.json({ message: "User blocked successfully" });
   } catch (error) {
+    console.error("Error blocking user:", error); // Log the error
     res.status(500).json({ message: error.message });
   }
 });
@@ -623,18 +645,165 @@ function get_slot_index_from_time(time_obj, start_time) {
 }
 
 // Create a booking for a user with podId, timeSlot and status as pending by default
+// const createBooking = asyncHandler(async (req, res) => {
+//   const { _id } = req.user;
+//   const { podId } = req.params;
+//   validateMongoDbId(_id);
+//   validateMongoDbId(podId);
+//   try {
+//     const { bookingDate, startTime, endTime, timeSlotNumber, bookingPurpose, description } = req.body;
+
+//     const user = await User.findById(_id);
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     // Convert bookingDate, startTime, and endTime to Date objects in IST
+//     const bookingDateObj = moment.tz(bookingDate, "Asia/Kolkata").toDate();
+//     const startTimeObj = moment.tz(startTime, "Asia/Kolkata").toDate();
+//     const endTimeObj = moment.tz(endTime, "Asia/Kolkata").toDate();
+
+//     // Check for overlapping bookings
+//     const existingBooking = await Booking.findOne({
+//       podId,
+//       status: { $ne: 'Cancelled' }, 
+//       $or: [
+//         {
+//           $and: [
+//             { startTime: { $lte: startTimeObj } },
+//             { endTime: { $gte: endTimeObj } },
+//           ],
+//         }, // Check if new booking starts during existing booking
+//         {
+//           $and: [
+//             { startTime: { $lte: endTimeObj } },
+//             { endTime: { $gte: endTimeObj } },
+//           ],
+//         }, // Check if new booking ends during existing booking
+//         {
+//           $and: [
+//             { startTime: { $gte: startTimeObj } },
+//             { endTime: { $lte: endTimeObj } },
+//           ],
+//         }, // Check if new booking is completely within existing booking
+//       ],
+//     });
+//     if (existingBooking) {
+//       return res.status(400).json({ message: "Booking with the same date and time already exists" });
+//     }
+
+//     // Generate QR Code Data String
+//     const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000);
+//     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000);
+ 
+//     // // Calculate IST Unix timestamps by adding the offset (19800 seconds)
+//     // const IST_OFFSET_SECONDS = 19800; // 5 hours and 30 minutes in seconds
+//     // const startTimeIST = startTimeStamp + IST_OFFSET_SECONDS;
+//     // const endTimeIST = endTimeStamp + IST_OFFSET_SECONDS;
+//     const qrCodeDataString = `F2/${process.env.DEVICE_ID}/${process.env.USER_ID}/0/${endTimeStamp}/${startTimeStamp}`;
+
+//     // Create new booking
+//     const newBooking = await Booking.create({
+//       user: user._id,
+//       podId,
+//       bookingDate: bookingDateObj,
+//       startTime: startTimeObj,
+//       endTime: endTimeObj,
+//       timeSlotNumber,
+//       bookingPurpose,
+//       description: description || null ,
+//       status: "Pending",
+//       qrCodeData: qrCodeDataString,
+//       feedback: {
+//         message:null,
+//         rating: null,
+//       }
+//     });
+
+//     user.booking.push(newBooking._id);
+//     await user.save();
+
+//     // Create or update product availability entry
+//     const productAvailability = await ProductAvailability.findOne({
+//       product_id: podId,
+//       booking_date: {
+//         $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
+//         $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
+//       }
+//     });
+
+//     if (productAvailability) {
+//       // Update slot bookings
+//       let updatedSlotBookings = productAvailability.slot_bookings;
+//       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
+//       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+//       for (let i = startingIndex; i < endingIndex; i++) {
+//         updatedSlotBookings[i] = true;
+//       }      
+
+//       await ProductAvailability.findOneAndUpdate({_id:productAvailability._id}, {slot_bookings: updatedSlotBookings}, { new: true });
+//     } else {
+//       // Create new product availability entry
+//       const indexes = (END_TIME - START_TIME) * 4;
+//       const slotBookings = Array.from({ length: indexes }, () => false);
+//       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
+//       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+
+//       for (let i = startingIndex; i < endingIndex; i++) {
+//         slotBookings[i] = true;
+//       }
+
+//       const data = {
+//         product_id: podId,
+//         slot_bookings: slotBookings,
+//         booking_date: bookingDateObj,
+//       };
+//       await ProductAvailability.create(data);
+//     }
+    
+//     // Convert the new booking times to IST for the response
+//     const responseBooking = {
+//       ...newBooking._doc,
+//       bookingDate: moment(newBooking.bookingDate).tz("Asia/Kolkata").format(),
+//       startTime: moment(newBooking.startTime).tz("Asia/Kolkata").format(),
+//       endTime: moment(newBooking.endTime).tz("Asia/Kolkata").format(),
+//     };
+
+//     sendNotificationOnBooking(user, newBooking);
+//     res.status(201).json({ message: "Booking created successfully", booking: responseBooking });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
 const createBooking = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   const { podId } = req.params;
   validateMongoDbId(_id);
   validateMongoDbId(podId);
   try {
-    const { bookingDate, startTime, endTime, timeSlotNumber, bookingPurpose, description } = req.body;
+    const {
+      bookingDate,
+      startTime,
+      endTime,
+      timeSlotNumber,
+      bookingPurpose,
+      description,
+    } = req.body;
 
     const user = await User.findById(_id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    // Fetch the pod details to get the device ID
+    const pod = await productModel.findById(podId);
+    if (!pod) {
+      return res.status(404).json({ message: "Pod not found" });
+    }
+
+    const deviceId = pod.deviceId;
+    const UserID = pod.UserId;
 
     // Convert bookingDate, startTime, and endTime to Date objects in IST
     const bookingDateObj = moment.tz(bookingDate, "Asia/Kolkata").toDate();
@@ -644,7 +813,7 @@ const createBooking = asyncHandler(async (req, res) => {
     // Check for overlapping bookings
     const existingBooking = await Booking.findOne({
       podId,
-      status: { $ne: 'Cancelled' }, 
+      status: { $ne: "Cancelled" },
       $or: [
         {
           $and: [
@@ -667,18 +836,17 @@ const createBooking = asyncHandler(async (req, res) => {
       ],
     });
     if (existingBooking) {
-      return res.status(400).json({ message: "Booking with the same date and time already exists" });
+      return res
+        .status(400)
+        .json({
+          message: "Booking with the same date and time already exists",
+        });
     }
 
     // Generate QR Code Data String
     const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000);
     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000);
- 
-    // // Calculate IST Unix timestamps by adding the offset (19800 seconds)
-    // const IST_OFFSET_SECONDS = 19800; // 5 hours and 30 minutes in seconds
-    // const startTimeIST = startTimeStamp + IST_OFFSET_SECONDS;
-    // const endTimeIST = endTimeStamp + IST_OFFSET_SECONDS;
-    const qrCodeDataString = `F2/33346/629039/0/${endTimeStamp}/${startTimeStamp}`;
+    const qrCodeDataString = `F2/${deviceId}/${UserID}/0/${endTimeStamp}/${startTimeStamp}`;
 
     // Create new booking
     const newBooking = await Booking.create({
@@ -689,13 +857,13 @@ const createBooking = asyncHandler(async (req, res) => {
       endTime: endTimeObj,
       timeSlotNumber,
       bookingPurpose,
-      description: description || null ,
+      description: description || null,
       status: "Pending",
       qrCodeData: qrCodeDataString,
       feedback: {
-        message:null,
+        message: null,
         rating: null,
-      }
+      },
     });
 
     user.booking.push(newBooking._id);
@@ -705,9 +873,17 @@ const createBooking = asyncHandler(async (req, res) => {
     const productAvailability = await ProductAvailability.findOne({
       product_id: podId,
       booking_date: {
-        $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
-        $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
-      }
+        $gte: new Date(
+          bookingDateObj.getFullYear(),
+          bookingDateObj.getMonth(),
+          bookingDateObj.getDate()
+        ),
+        $lt: new Date(
+          bookingDateObj.getFullYear(),
+          bookingDateObj.getMonth(),
+          bookingDateObj.getDate() + 1
+        ),
+      },
     });
 
     if (productAvailability) {
@@ -717,9 +893,13 @@ const createBooking = asyncHandler(async (req, res) => {
       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
       for (let i = startingIndex; i < endingIndex; i++) {
         updatedSlotBookings[i] = true;
-      }      
+      }
 
-      await ProductAvailability.findOneAndUpdate({_id:productAvailability._id}, {slot_bookings: updatedSlotBookings}, { new: true });
+      await ProductAvailability.findOneAndUpdate(
+        { _id: productAvailability._id },
+        { slot_bookings: updatedSlotBookings },
+        { new: true }
+      );
     } else {
       // Create new product availability entry
       const indexes = (END_TIME - START_TIME) * 4;
@@ -738,7 +918,7 @@ const createBooking = asyncHandler(async (req, res) => {
       };
       await ProductAvailability.create(data);
     }
-    
+
     // Convert the new booking times to IST for the response
     const responseBooking = {
       ...newBooking._doc,
@@ -748,12 +928,18 @@ const createBooking = asyncHandler(async (req, res) => {
     };
 
     sendNotificationOnBooking(user, newBooking);
-    res.status(201).json({ message: "Booking created successfully", booking: responseBooking });
+    res
+      .status(201)
+      .json({
+        message: "Booking created successfully",
+        booking: responseBooking,
+      });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
 
 const sendNotificationOnBooking = asyncHandler(async (user = null, booking, userId = null) => {
   try {

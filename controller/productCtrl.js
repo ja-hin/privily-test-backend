@@ -9,13 +9,36 @@ const { START_TIME, END_TIME } = require('./constants');
 const moment = require('moment-timezone');
 
 // create a pod with details
+// const createProduct = asyncHandler(async (req, res) => {
+//   try {
+//    const location_obj = await Location.findOne({_id: req.body.location})
+//     req.body.location = location_obj._id
+//     if (req.body.title) {
+//       req.body.slug = slugify(req.body.title+"_"+location_obj.slug);
+//     }
+//     const newProduct = await Product.create(req.body);
+//     res.json(newProduct);
+//   } catch (error) {
+//     console.error(error); // Log the error for debugging purposes
+//     res.status(500).json({
+//       status: "fail",
+//       message: "An error occurred while creating the product.",
+//     });
+//   }
+// });
 const createProduct = asyncHandler(async (req, res) => {
   try {
-    location_obj = await Location.findOne({_id: req.body.location})
-    req.body.location = location_obj._id
+    const location_obj = await Location.findOne({ _id: req.body.location });
+    req.body.location = location_obj.id;
+
     if (req.body.title) {
-      req.body.slug = slugify(req.body.title+"_"+location_obj.slug);
+      req.body.slug = slugify(req.body.title + "" + location_obj.slug);
     }
+
+    // Add device ID to the product schema
+    req.body.deviceId = req.body.deviceId;
+    req.body.userId = req.body.userId;
+
     const newProduct = await Product.create(req.body);
     res.json(newProduct);
   } catch (error) {
@@ -26,6 +49,7 @@ const createProduct = asyncHandler(async (req, res) => {
     });
   }
 });
+
 
 // update a pod details
 const updateProduct = asyncHandler(async (req, res) => {
@@ -87,19 +111,35 @@ const getaProduct = asyncHandler(async (req, res) => {
 });
 
 // get all pod details
+// const getAllProducts = asyncHandler(async (req, res) => {
+//   try {
+//     filter = {}
+//     if (req?.query?.isAvailable){
+//       filter['isAvailable'] = Boolean(req.query.isAvailable)
+//     }
+//     const products = await Product.find(filter).populate({ path: 'location' });;
+//     res.json(products);
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
 const getAllProducts = asyncHandler(async (req, res) => {
   try {
-    filter = {}
-    if (req?.query?.isAvailable){
-      filter['isAvailable'] = Boolean(req.query.isAvailable)
+    let filter = {};
+    if (req?.query?.isAvailable) {
+      filter["isAvailable"] = Boolean(req.query.isAvailable);
     }
-    const products = await Product.find(filter).populate({ path: 'location' });;
+
+    const products = await Product.find(filter)
+      .populate("location")
+      .populate("features"); // Ensure features are populated correctly
+
     res.json(products);
   } catch (error) {
-    throw new Error(error);
+    console.error(error);
+    res.status(500).json({ message: "Server Error" });
   }
 });
-
 // var geocoder = require('local-reverse-geocoder');
 
 const getLocationsFromCity = async (city_name)=> {

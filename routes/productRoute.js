@@ -16,6 +16,7 @@ const router = express.Router();
 router.get("/availability/:id", productAvailability);
 router.post("/create-pods", createProduct);
 router.get("/", getAllProducts);
+router.get("/getall", authMiddleware, isAdmin, getAllProducts);
 router.get("/filter", getAllProductUsingFilter);
 router.put("/rating", authMiddleware, rating);
 router.get("/address", getAllProductAddress);

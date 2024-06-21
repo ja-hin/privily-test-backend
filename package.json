@@ -29,7 +29,8 @@
         "sharp": "^0.31.2",
         "slugify": "^1.6.5",
         "twilio": "^5.0.4",
-        "uniqid": "^5.4.0"
+        "uniqid": "^5.4.0",
+        "ws": "^8.17.0"
     },
     "devDependencies": {
         "nodemon": "^2.0.22"
