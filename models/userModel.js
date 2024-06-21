@@ -74,6 +74,9 @@ var userSchema = new mongoose.Schema(
         },
       },
     ],
+    auth_page: {
+      type: [Number], // Array of numbers
+    },
     // booking model connect
     booking: [
       {

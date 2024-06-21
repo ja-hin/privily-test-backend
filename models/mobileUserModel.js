@@ -1,5 +1,5 @@
 // models/mobileUserModel.js
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const mobileUserSchema = new mongoose.Schema({
     user: {
@@ -8,7 +8,7 @@ const mobileUserSchema = new mongoose.Schema({
     },
     phoneNumber: { type: String, required: true, unique: true },
     otp: String,
-    otpExpires: Date
+    otpExpires: Date,
 });
 
-module.exports = mongoose.model('MobileUser', mobileUserSchema);
+module.exports = mongoose.model("MobileUser", mobileUserSchema);

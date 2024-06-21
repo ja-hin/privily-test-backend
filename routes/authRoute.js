@@ -36,6 +36,7 @@ const {
   corporatePods,
   getMe,
   extendBooking,
+  addRoles,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -47,6 +48,7 @@ router.post("/login", loginUserCtrl);
 router.get('/me', authMiddleware, getMe);
 router.post("/app-login", loginMobileUserCtrl);
 router.post("/verify-otp", verifyMobileOtp);
+router.post("/add-roles", addRoles);
 router.get("/logout", logout);
 router.post("/admin-login", loginAdmin);
 

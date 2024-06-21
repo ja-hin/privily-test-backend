@@ -10,9 +10,9 @@ const { sendEmail } = require("./emailCtrl");
 const twilio = require("twilio");
 const MobileUserModel = require("../models/mobileUserModel");
 const ProductAvailability = require("../models/productAvailability");
-const { START_TIME, END_TIME } = require('./constants');
-const Corporate = require('../models/corporateModel');
-const moment = require('moment-timezone');
+const { START_TIME, END_TIME } = require("./constants");
+const Corporate = require("../models/corporateModel");
+const moment = require("moment-timezone");
 const productModel = require("../models/productModel");
 
 const twilioClient = twilio(
@@ -33,9 +33,9 @@ const twilioClient = twilio(
 //   }
 // });
 const createUser = asyncHandler(async (req, res) => {
-  const { email, phoneNumber, firstname, lastname } = req.body;
+  const { email, mobile, firstname, lastname } = req.body;
 
-  if (!email || !phoneNumber || !firstname || !lastname) {
+  if (!email || !mobile || !firstname || !lastname) {
     return res.status(400).send("All fields are required");
   }
 
@@ -47,13 +47,13 @@ const createUser = asyncHandler(async (req, res) => {
   try {
     const newUser = new User({
       email,
-      mobile: phoneNumber,
+      mobile,
       firstname,
       lastname,
       // password field is not included
     });
     await newUser.save();
-
+    console.log("user registered");
     const token = generateToken(newUser._id);
     res.json({
       message: "User registered successfully",
@@ -66,6 +66,32 @@ const createUser = asyncHandler(async (req, res) => {
   }
 });
 
+const addRoles = asyncHandler(async (req, res) => {
+  const { id, role } = req.body;
+
+  if (!id || !Array.isArray(role)) {
+    return res.status(400).send("Invalid request body");
+  }
+
+  try {
+    // Find the user by ID and update the auth_page field
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    // Add new roles to auth_page field
+    user.auth_page = role
+
+    // Save the updated user document
+    await user.save();
+
+    res.status(200).send("Roles added successfully");
+  } catch (error) {
+    res.status(500).send("Server error");
+  }
+});
 
 // Login a user
 const loginUserCtrl = asyncHandler(async (req, res) => {
@@ -74,9 +100,7 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
   const findUser = await User.findOne({ email });
   if (findUser && (await findUser.isPasswordMatched(password))) {
     const refreshToken = await generateRefreshToken(findUser?._id);
-    await User.findByIdAndUpdate(
-      findUser._id, {refreshToken}
-    );
+    await User.findByIdAndUpdate(findUser._id, { refreshToken });
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       maxAge: 72 * 60 * 60 * 1000,
@@ -96,7 +120,7 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
 
 // const loginMobileUserCtrl = asyncHandler(async (req, res) => {
 //   const { phoneNumber, user } = req.body;
-  
+
 //   if (!phoneNumber || !user) {
 //     return res.status(400).send("Phone number and user ID are required");
 //   }
@@ -161,7 +185,6 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
 
 //     // res.send("OTP sent successfully");
 
-
 //     const refreshToken = await generateRefreshToken(mobileUser?.user?._id);
 //     const updateuser = await User.findByIdAndUpdate(
 //       mobileUser?.user?.id,
@@ -212,7 +235,6 @@ const loginMobileUserCtrl = asyncHandler(async (req, res) => {
   }
 });
 
-
 // admin login
 const loginAdmin = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -220,7 +242,7 @@ const loginAdmin = asyncHandler(async (req, res) => {
   if (findAdmin.role !== "admin") throw new Error("Not Authorised");
   if (findAdmin && (await findAdmin.isPasswordMatched(password))) {
     const refreshToken = await generateRefreshToken(findAdmin?._id);
-    await User.findByIdAndUpdate(findAdmin._id, {refreshToken});
+    await User.findByIdAndUpdate(findAdmin._id, { refreshToken });
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       maxAge: 72 * 60 * 60 * 1000,
@@ -286,8 +308,8 @@ const verifyMobileOtp = asyncHandler(async (req, res) => {
     await mobileUser.save();
 
     const existingUser = await User.findOne({ mobile: phoneNumber });
-    console.log("existingUser")
-    console.log(existingUser)
+    console.log("existingUser");
+    console.log(existingUser);
     if (existingUser) {
       if (existingUser.isBlocked) {
         return res.status(403).json({ message: "User is blocked" });
@@ -583,22 +605,22 @@ const corporatePods = asyncHandler(async (req, res) => {
   const { companyName, email, mobile } = req.body;
 
   const corporate = new Corporate({
-      companyName,
-      email,
-      mobile
+    companyName,
+    email,
+    mobile,
   });
 
   // Save the data to the database
   const savedData = await corporate.save();
 
   res.status(201).json({
-      message: 'Thanks for your Query',
-      corporate: {
-          _id: savedData._id,
-          companyName: savedData.companyName,
-          email: savedData.email,
-          mobile: savedData.mobile
-      }
+    message: "Thanks for your Query",
+    corporate: {
+      _id: savedData._id,
+      companyName: savedData.companyName,
+      email: savedData.email,
+      mobile: savedData.mobile,
+    },
   });
 });
 
@@ -666,7 +688,7 @@ function get_slot_index_from_time(time_obj, start_time) {
 //     // Check for overlapping bookings
 //     const existingBooking = await Booking.findOne({
 //       podId,
-//       status: { $ne: 'Cancelled' }, 
+//       status: { $ne: 'Cancelled' },
 //       $or: [
 //         {
 //           $and: [
@@ -695,7 +717,7 @@ function get_slot_index_from_time(time_obj, start_time) {
 //     // Generate QR Code Data String
 //     const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000);
 //     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000);
- 
+
 //     // // Calculate IST Unix timestamps by adding the offset (19800 seconds)
 //     // const IST_OFFSET_SECONDS = 19800; // 5 hours and 30 minutes in seconds
 //     // const startTimeIST = startTimeStamp + IST_OFFSET_SECONDS;
@@ -739,7 +761,7 @@ function get_slot_index_from_time(time_obj, start_time) {
 //       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
 //       for (let i = startingIndex; i < endingIndex; i++) {
 //         updatedSlotBookings[i] = true;
-//       }      
+//       }
 
 //       await ProductAvailability.findOneAndUpdate({_id:productAvailability._id}, {slot_bookings: updatedSlotBookings}, { new: true });
 //     } else {
@@ -760,7 +782,7 @@ function get_slot_index_from_time(time_obj, start_time) {
 //       };
 //       await ProductAvailability.create(data);
 //     }
-    
+
 //     // Convert the new booking times to IST for the response
 //     const responseBooking = {
 //       ...newBooking._doc,
@@ -836,11 +858,9 @@ const createBooking = asyncHandler(async (req, res) => {
       ],
     });
     if (existingBooking) {
-      return res
-        .status(400)
-        .json({
-          message: "Booking with the same date and time already exists",
-        });
+      return res.status(400).json({
+        message: "Booking with the same date and time already exists",
+      });
     }
 
     // Generate QR Code Data String
@@ -928,39 +948,41 @@ const createBooking = asyncHandler(async (req, res) => {
     };
 
     sendNotificationOnBooking(user, newBooking);
-    res
-      .status(201)
-      .json({
-        message: "Booking created successfully",
-        booking: responseBooking,
-      });
+    res.status(201).json({
+      message: "Booking created successfully",
+      booking: responseBooking,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
+const sendNotificationOnBooking = asyncHandler(
+  async (user = null, booking, userId = null) => {
+    try {
+      if (!user && !userId) {
+        throw new Error("Any one of User or UserId is required");
+      }
+      if (!user) {
+        user = await User.findById(userId);
+      }
+      if (!user) throw new Error("User not found");
 
-const sendNotificationOnBooking = asyncHandler(async (user = null, booking, userId = null) => {
-  try {
-    if (!user && !userId) {
-      throw new Error("Any one of User or UserId is required");
-    }
-    if (!user) {
-      user = await User.findById(userId);
-    }
-    if (!user) throw new Error("User not found");
+      booking = booking.populate("podId");
+      if (!booking) throw new Error("Booking not found");
 
-    booking = booking.populate("podId");
-    if (!booking) throw new Error("Booking not found");
+      // Format booking date and times
+      const formattedBookingDate = booking.bookingDate.toDateString();
+      const formattedStartTime = moment(booking.startTime)
+        .tz("Asia/Kolkata")
+        .format("hh:mm A");
+      const formattedEndTime = moment(booking.endTime)
+        .tz("Asia/Kolkata")
+        .format("hh:mm A");
 
-    // Format booking date and times
-    const formattedBookingDate = booking.bookingDate.toDateString();
-    const formattedStartTime = moment(booking.startTime).tz("Asia/Kolkata").format("hh:mm A");
-    const formattedEndTime = moment(booking.endTime).tz("Asia/Kolkata").format("hh:mm A");
-
-    // Construct email content
-    const emailContent = `
+      // Construct email content
+      const emailContent = `
       <p>Hi ${user.firstname},</p>
       <p>Your booking details:</p>
       <ul>
@@ -973,19 +995,20 @@ const sendNotificationOnBooking = asyncHandler(async (user = null, booking, user
       <p>Thank you for booking with us!</p>
     `;
 
-    // Send email
-    const data = {
-      to: user.email,
-      subject: "Booking Notification",
-      html: emailContent,
-    };
-    await sendEmail(data.to, data.subject, data.html);
-    console.log("Email sent successfully.");
-  } catch (error) {
-    console.error("Error sending notification:", error.message);
-    throw new Error("Failed to send notification");
+      // Send email
+      const data = {
+        to: user.email,
+        subject: "Booking Notification",
+        html: emailContent,
+      };
+      await sendEmail(data.to, data.subject, data.html);
+      console.log("Email sent successfully.");
+    } catch (error) {
+      console.error("Error sending notification:", error.message);
+      throw new Error("Failed to send notification");
+    }
   }
-});
+);
 
 //extend booking time
 const extendBooking = asyncHandler(async (req, res) => {
@@ -1008,9 +1031,17 @@ const extendBooking = asyncHandler(async (req, res) => {
     let productAvailability = await ProductAvailability.findOne({
       product_id: podId,
       booking_date: {
-        $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
-        $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
-      }
+        $gte: new Date(
+          bookingDateObj.getFullYear(),
+          bookingDateObj.getMonth(),
+          bookingDateObj.getDate()
+        ),
+        $lt: new Date(
+          bookingDateObj.getFullYear(),
+          bookingDateObj.getMonth(),
+          bookingDateObj.getDate() + 1
+        ),
+      },
     });
 
     if (!productAvailability) {
@@ -1019,13 +1050,15 @@ const extendBooking = asyncHandler(async (req, res) => {
       productAvailability = new ProductAvailability({
         product_id: podId,
         slot_bookings: slotBookings,
-        booking_date: bookingDateObj
+        booking_date: bookingDateObj,
       });
       await productAvailability.save();
     }
 
     // Calculate the new end time
-    const newEndTimeObj = new Date(endTimeObj.getTime() + extensionMinutes * 60000);
+    const newEndTimeObj = new Date(
+      endTimeObj.getTime() + extensionMinutes * 60000
+    );
     const currentEndingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
     const newEndingIndex = get_slot_index_from_time(newEndTimeObj, START_TIME);
 
@@ -1033,16 +1066,26 @@ const extendBooking = asyncHandler(async (req, res) => {
     const slotBookings = productAvailability.slot_bookings;
     for (let i = currentEndingIndex; i < newEndingIndex; i++) {
       if (slotBookings[i]) {
-        return res.status(400).json({ message: "Slot not available for the requested extension time." });
+        return res
+          .status(400)
+          .json({
+            message: "Slot not available for the requested extension time.",
+          });
       }
       slotBookings[i] = true;
     }
 
-    await ProductAvailability.findOneAndUpdate({ _id: productAvailability._id }, { slot_bookings: slotBookings }, { new: true });
+    await ProductAvailability.findOneAndUpdate(
+      { _id: productAvailability._id },
+      { slot_bookings: slotBookings },
+      { new: true }
+    );
 
     // Update booking endTime
     booking.endTime = newEndTimeObj;
-    booking.qrCodeData = `F2/33346/629039/0/${Math.floor(newEndTimeObj.getTime() / 1000)}/${Math.floor(new Date(booking.startTime).getTime() / 1000)}`;
+    booking.qrCodeData = `F2/33346/629039/0/${Math.floor(
+      newEndTimeObj.getTime() / 1000
+    )}/${Math.floor(new Date(booking.startTime).getTime() / 1000)}`;
     await booking.save();
 
     // Convert the updated booking times to IST for the response
@@ -1053,13 +1096,17 @@ const extendBooking = asyncHandler(async (req, res) => {
       endTime: moment(booking.endTime).tz("Asia/Kolkata").format(),
     };
 
-    return res.status(200).json({ message: "Booking extended successfully", booking: responseBooking });
+    return res
+      .status(200)
+      .json({
+        message: "Booking extended successfully",
+        booking: responseBooking,
+      });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 
 // get all bookings for a user
 // const getBookingsByUser = asyncHandler(async (req, res) => {
@@ -1085,7 +1132,7 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
   validateMongoDbId(_id);
   try {
     // Call updateBookingStatusAutomatically function
-    await updateBookingStatusAutomatically(req, res, async () => {});
+    await updateBookingStatusAutomatically(req, res, async () => { });
 
     const user = await User.findById(_id).populate("booking");
     if (!user) {
@@ -1102,7 +1149,6 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
   }
 });
 
-
 // Get all bookings for admin to manage and update status of booking as per the status
 // const getBookings = asyncHandler(async (req, res) => {
 //   try {
@@ -1115,7 +1161,7 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
 const getBookings = asyncHandler(async (req, res) => {
   try {
     // Call updateBookingStatusAutomatically function
-    await updateBookingStatusAutomatically(req, res, async () => {});
+    await updateBookingStatusAutomatically(req, res, async () => { });
 
     const allBookings = await Booking.find();
     res.json(allBookings);
@@ -1123,7 +1169,6 @@ const getBookings = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
-
 
 // Get a booking by ID for admin to manage and update status of booking as per the status
 const getBookingById = asyncHandler(async (req, res) => {
@@ -1226,7 +1271,8 @@ const cancelBooking = asyncHandler(async (req, res) => {
     }
     if (booking.status !== "Pending" && booking.status !== "Confirmed") {
       return res.status(403).json({
-        message: "Cannot cancel booking with status other than Pending or Confirmed",
+        message:
+          "Cannot cancel booking with status other than Pending or Confirmed",
       });
     }
     // Check if booking's start time is within the last 5 minutes
@@ -1247,20 +1293,35 @@ const cancelBooking = asyncHandler(async (req, res) => {
     const productAvailability = await ProductAvailability.findOne({
       product_id: booking.podId,
       booking_date: {
-        $gte: new Date(booking.bookingDate.getFullYear(), booking.bookingDate.getMonth(), booking.bookingDate.getDate()),
-        $lt: new Date(booking.bookingDate.getFullYear(), booking.bookingDate.getMonth(), booking.bookingDate.getDate() + 1)
-      }
+        $gte: new Date(
+          booking.bookingDate.getFullYear(),
+          booking.bookingDate.getMonth(),
+          booking.bookingDate.getDate()
+        ),
+        $lt: new Date(
+          booking.bookingDate.getFullYear(),
+          booking.bookingDate.getMonth(),
+          booking.bookingDate.getDate() + 1
+        ),
+      },
     });
 
     if (productAvailability) {
       let updatedSlotBookings = productAvailability.slot_bookings;
-      const startingIndex = get_slot_index_from_time(booking.startTime, START_TIME);
+      const startingIndex = get_slot_index_from_time(
+        booking.startTime,
+        START_TIME
+      );
       const endingIndex = get_slot_index_from_time(booking.endTime, START_TIME);
       for (let i = startingIndex; i < endingIndex; i++) {
         updatedSlotBookings[i] = false;
       }
 
-      await ProductAvailability.findOneAndUpdate({_id: productAvailability._id}, {slot_bookings: updatedSlotBookings}, { new: true });
+      await ProductAvailability.findOneAndUpdate(
+        { _id: productAvailability._id },
+        { slot_bookings: updatedSlotBookings },
+        { new: true }
+      );
     }
 
     res.json({ message: "Booking cancelled successfully", booking });
@@ -1268,7 +1329,6 @@ const cancelBooking = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 
 // const cancelBooking = asyncHandler(async (req, res) => {
 //   const { id } = req.params;
@@ -1312,9 +1372,13 @@ const bookingFeedback = asyncHandler(async (req, res) => {
     const booking_id = req.params.id;
     const { message, rating } = req.body;
     await Booking.findById(booking_id);
-    const updatedBooking = await Booking.findByIdAndUpdate(booking_id, { 'feedback.rating': rating, 'feedback.message': message }, {
-      new: true,
-    });
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      booking_id,
+      { "feedback.rating": rating, "feedback.message": message },
+      {
+        new: true,
+      }
+    );
     res.json(updatedBooking);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1476,7 +1540,6 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
   }
 };
 
-
 // rating a booking after completion of booking by user if status is Completed
 const rateBooking = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -1508,7 +1571,7 @@ const rateBooking = asyncHandler(async (req, res) => {
       rating,
       message,
     };
-    
+
     if (!product.ratings) {
       product.ratings = [];
     }
@@ -1609,25 +1672,28 @@ const sendNotification = asyncHandler(async (req, res) => {
 
 const getAllNotification = asyncHandler(async (req, res) => {
   const user = req.user;
-  await updateBookingStatusAutomatically(req, res, async () => {});
-  const bookings = await Booking.find({ user: user._id,
-    status: "Completed"})
-  result = {data:[]}
-  bookings.forEach(booking => {
-    result['data'].push({
-      'message': 'This is regarding your last booking on '+booking.bookingDate.toString(),
-      'booking_id': booking._id,
-      'icon': 'icon to send',
-      'type': 'Rating' // as per this type, frontend will redirect to feedback mark page.
-    })
-  })
-  res.json(result)
-  })
-
-
+  await updateBookingStatusAutomatically(req, res, async () => { });
+  const bookings = await Booking.find({
+    user: user._id,
+    status: "Completed",
+  });
+  result = { data: [] };
+  bookings.forEach((booking) => {
+    result["data"].push({
+      message:
+        "This is regarding your last booking on " +
+        booking.bookingDate.toString(),
+      booking_id: booking._id,
+      icon: "icon to send",
+      type: "Rating", // as per this type, frontend will redirect to feedback mark page.
+    });
+  });
+  res.json(result);
+});
 
 module.exports = {
   createUser,
+  addRoles,
   loginUserCtrl,
   loginMobileUserCtrl,
   verifyMobileOtp,
