@@ -14,6 +14,7 @@ const { START_TIME, END_TIME } = require("./constants");
 const Corporate = require("../models/corporateModel");
 const moment = require("moment-timezone");
 const productModel = require("../models/productModel");
+const registerstaff = require("../models/registerstaff");
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -66,58 +67,167 @@ const createUser = asyncHandler(async (req, res) => {
   }
 });
 
-const addRoles = asyncHandler(async (req, res) => {
-  const { id, role } = req.body;
+// const addRoles = asyncHandler(async (req, res) => {
+//   const { id, role } = req.body;
 
-  if (!id || !Array.isArray(role)) {
-    return res.status(400).send("Invalid request body");
+//   if (!id || !Array.isArray(role)) {
+//     return res.status(400).send("Invalid request body");
+//   }
+
+//   try {
+//     // Find the user by ID and update the auth_page field
+//     const user = await User.findById(id);
+
+//     if (!user) {
+//       return res.status(404).send("User not found");
+//     }
+
+//     // Add new roles to auth_page field
+//     user.auth_page = role
+
+//     // Save the updated user document
+//     await user.save();
+
+//     res.status(200).send("Roles added successfully");
+//   } catch (error) {
+//     res.status(500).send("Server error");
+//   }
+// });
+
+
+// const addRoles = asyncHandler(async (req, res) => {
+//   const { id, role } = req.body;
+
+//   console.log("Request body:", req.body); // Log the request body
+//   try {
+//     validateMongoDbId(id); // Validate the ID before proceeding
+//   } catch (error) {
+//     console.error("Validation error:", error.message); // Log the validation error
+//     return res.status(400).send(error.message);
+//   }
+
+//   if (!id || !Array.isArray(role)) {
+//     return res.status(400).send("Invalid request body");
+//   }
+
+//   try {
+//     // Find the user by ID and update the auth_page field
+//     const user = await User.findById(id);
+//     console.log("User found:", user); // Log the found user
+
+//     if (!user) {
+//       return res.status(404).send("User not found");
+//     }
+
+//     // Add new roles to auth_page field
+//     user.auth_page = role;
+
+//     // Save the updated user document
+//     await user.save();
+
+//     res.status(200).send("Roles added successfully");
+//   } catch (error) {
+//     console.error("Server error:", error); // Log the server error
+//     res.status(500).send("Server error");
+//   }
+// });
+//new..
+
+const registerAndAssignRoles = asyncHandler(async (req, res) => {
+  const { firstname, lastname, email, mobile, password, role, auth_page } =
+    req.body;
+
+  // Validate input
+  if (
+    !firstname ||
+    !lastname ||
+    !email ||
+    !mobile ||
+    !password ||
+    !role ||
+    !auth_page
+  ) {
+    return res.status(400).send("All fields are required");
   }
 
-  try {
-    // Find the user by ID and update the auth_page field
-    const user = await User.findById(id);
-
-    if (!user) {
-      return res.status(404).send("User not found");
-    }
-
-    // Add new roles to auth_page field
-    user.auth_page = role
-
-    // Save the updated user document
-    await user.save();
-
-    res.status(200).send("Roles added successfully");
-  } catch (error) {
-    res.status(500).send("Server error");
+  // Check if user already exists
+  const existingUser = await registerstaff.findOne({ email });
+  if (existingUser) {
+    return res.status(400).send("User with this email already exists");
   }
+
+  // Create new staff member
+  const staffMember = new registerstaff({
+    firstname,
+    lastname,
+    email,
+    mobile,
+    password,
+    role,
+    auth_page,
+  });
+
+  // Save the new staff member
+  await staffMember.save();
+
+  res
+    .status(201)
+    .send("Staff member registered and roles assigned successfully");
 });
 
 // Login a user
+// const loginUserCtrl = asyncHandler(async (req, res) => {
+//   const { email, password } = req.body;
+
+//   // check if user exists or not
+//   const findUser = await registerstaff.findOne({ email });
+//   if (findUser && (await findUser.isPasswordMatched(password))) {
+//     const refreshToken = await generateRefreshToken(findUser?._id);
+//     await registerstaff.findByIdAndUpdate(findUser._id, { refreshToken });
+//     res.cookie("refreshToken", refreshToken, {
+//       httpOnly: true,
+//       maxAge: 72 * 60 * 60 * 1000,
+//     });
+//     res.json({
+//       _id: findStaff._id,
+//       firstname: findStaff.firstname,
+//       lastname: findStaff.lastname,
+//       email: findStaff.email,
+//       mobile: findStaff.mobile,
+//       role: findStaff.role,
+//       auth_page: findStaff.auth_page,
+//       token: generateToken(findStaff._id),
+//     });
+//   } else {
+//     throw new Error("Invalid Credentials");
+//   }
+// });
 const loginUserCtrl = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  // check if user exists or not
-  const findUser = await User.findOne({ email });
-  if (findUser && (await findUser.isPasswordMatched(password))) {
-    const refreshToken = await generateRefreshToken(findUser?._id);
-    await User.findByIdAndUpdate(findUser._id, { refreshToken });
+
+  // Check if staff exists
+  const findStaff = await registerstaff.findOne({ email });
+  if (findStaff && (await findStaff.isPasswordMatched(password))) {
+    const refreshToken = generateRefreshToken(findStaff._id);
+    await registerstaff.findByIdAndUpdate(findStaff._id, { refreshToken });
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      maxAge: 72 * 60 * 60 * 1000,
+      maxAge: 72 * 60 * 60 * 1000, // 3 days
     });
     res.json({
-      _id: findUser?._id,
-      firstname: findUser?.firstname,
-      lastname: findUser?.lastname,
-      email: findUser?.email,
-      mobile: findUser?.mobile,
-      token: generateToken(findUser?._id),
+      _id: findStaff._id,
+      firstname: findStaff.firstname,
+      lastname: findStaff.lastname,
+      email: findStaff.email,
+      mobile: findStaff.mobile,
+      role: findStaff.role,
+      auth_page: findStaff.auth_page,
+      token: generateToken(findStaff._id),
     });
   } else {
-    throw new Error("Invalid Credentials");
+    res.status(401).send("Invalid Credentials");
   }
 });
-
 // const loginMobileUserCtrl = asyncHandler(async (req, res) => {
 //   const { phoneNumber, user } = req.body;
 
@@ -1693,7 +1803,6 @@ const getAllNotification = asyncHandler(async (req, res) => {
 
 module.exports = {
   createUser,
-  addRoles,
   loginUserCtrl,
   loginMobileUserCtrl,
   verifyMobileOtp,
@@ -1727,4 +1836,5 @@ module.exports = {
   getAllNotification,
   getMe,
   extendBooking,
+  registerAndAssignRoles,
 };
