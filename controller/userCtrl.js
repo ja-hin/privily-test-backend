@@ -94,7 +94,6 @@ const createUser = asyncHandler(async (req, res) => {
 //   }
 // });
 
-
 // const addRoles = asyncHandler(async (req, res) => {
 //   const { id, role } = req.body;
 
@@ -437,6 +436,31 @@ const verifyMobileOtp = asyncHandler(async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send("Failed to verify OTP");
+  }
+});
+
+const verifyAuthPage = asyncHandler(async (req, res) => {
+  const { id, auth_page } = req.body;
+
+  if (!id || auth_page === undefined) {
+    return res.status(400).send("Invalid request body");
+  }
+
+  try {
+    // Find the user by ID
+    const user = await registerstaff.findById(id);
+
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    // Check if the auth_page array contains the specified page number
+    const success = user.auth_page.includes(auth_page);
+
+    // Return true if the user has access, otherwise false
+    res.status(200).json({ success });
+  } catch (error) {
+    res.status(500).send("Server error");
   }
 });
 
@@ -1176,11 +1200,9 @@ const extendBooking = asyncHandler(async (req, res) => {
     const slotBookings = productAvailability.slot_bookings;
     for (let i = currentEndingIndex; i < newEndingIndex; i++) {
       if (slotBookings[i]) {
-        return res
-          .status(400)
-          .json({
-            message: "Slot not available for the requested extension time.",
-          });
+        return res.status(400).json({
+          message: "Slot not available for the requested extension time.",
+        });
       }
       slotBookings[i] = true;
     }
@@ -1206,12 +1228,10 @@ const extendBooking = asyncHandler(async (req, res) => {
       endTime: moment(booking.endTime).tz("Asia/Kolkata").format(),
     };
 
-    return res
-      .status(200)
-      .json({
-        message: "Booking extended successfully",
-        booking: responseBooking,
-      });
+    return res.status(200).json({
+      message: "Booking extended successfully",
+      booking: responseBooking,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Internal server error" });
@@ -1806,6 +1826,7 @@ module.exports = {
   loginUserCtrl,
   loginMobileUserCtrl,
   verifyMobileOtp,
+  verifyAuthPage,
   getallUser,
   getaUser,
   deleteaUser,

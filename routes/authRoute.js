@@ -37,6 +37,7 @@ const {
   getMe,
   extendBooking,
   registerAndAssignRoles,
+  verifyAuthPage,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -48,6 +49,8 @@ router.post("/login", loginUserCtrl);
 router.get('/me', authMiddleware, getMe);
 router.post("/app-login", loginMobileUserCtrl);
 router.post("/verify-otp", verifyMobileOtp);
+router.post("/verify-page", verifyAuthPage);
+
 router.post("/register-staff", registerAndAssignRoles);
 router.get("/logout", logout);
 router.post("/admin-login", loginAdmin);
