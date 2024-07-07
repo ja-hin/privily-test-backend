@@ -1,3 +1,5 @@
+//routes/authRoute.js
+
 const express = require("express");
 const {
   createUser,
@@ -26,30 +28,51 @@ const {
   updateBookingStatusByAdmin,
   setCurrentLocation,
   sendNotification,
+  getAllNotification,
   rateBooking,
   loginMobileUserCtrl,
   verifyMobileOtp,
+  bookingFeedback,
+  corporatePods,
+  getMe,
+  extendBooking,
+  registerAndAssignRoles,
+  verifyAuthPage,
+  getallstaff,
+  blockStaff,
+  unblockStaff,
+  deleteStaff,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
+const { createPayment } = require("../controller/PaymentCtrl");
 
 const router = express.Router();
 
 router.post("/register", createUser);
 router.post("/login", loginUserCtrl);
+router.get('/me', authMiddleware, getMe);
 router.post("/app-login", loginMobileUserCtrl);
 router.post("/verify-otp", verifyMobileOtp);
+router.post("/verify-page", verifyAuthPage);
+
+router.post("/register-staff", registerAndAssignRoles);
 router.get("/logout", logout);
 router.post("/admin-login", loginAdmin);
-
+router.post("/create-payment", createPayment);
 router.post("/forgot-password-token", forgotPasswordToken);
 router.put("/reset-password/:token", resetPassword);
 router.put("/password", authMiddleware, updatePassword);
 router.get("/refresh", handleRefreshToken);
 
-router.get("/:id", authMiddleware, isAdmin, getaUser);
-router.get("/all-users", getallUser);
+router.get("/all-users", authMiddleware, isAdmin, getallUser);
+router.get("/all-staff", authMiddleware, isAdmin, getallstaff);
+router.put("/block-staff/:id", authMiddleware, isAdmin, blockStaff);
+router.put("/unblock-staff/:id", authMiddleware, isAdmin, unblockStaff);
+
+
 router.delete("/:id", authMiddleware, isAdmin, deleteaUser);
+router.delete("/delete-staff/:id", authMiddleware, isAdmin, deleteStaff);
 router.put("/edit-user", authMiddleware, updatedUser);
 router.put("/save-address", authMiddleware, saveAddress);
 router.put("/current-location", authMiddleware, setCurrentLocation);
@@ -59,12 +82,17 @@ router.put("/unblock-user/:id", authMiddleware, isAdmin, unblockUser);
 // router.post("/apply-coupon", authMiddleware, applyCoupon);
 
 router.post("/create-booking/:podId", authMiddleware, createBooking);
-router.get("/all-bookingsByUser", authMiddleware, getBookingsByUser); // not working
+router.get("/all-bookingsByUser", authMiddleware, getBookingsByUser);
 router.get("/all-bookings", authMiddleware, isAdmin, getBookings);
 
 router.get("/booking/:id", authMiddleware, getBookingById);
 router.put("/update-booking/:id", authMiddleware, updateBookingById);
-router.put("/cancle-booking/:id", authMiddleware, cancelBooking);
+router.put("/cancel-booking/:id", authMiddleware, cancelBooking);
+router.put("/feedback/:id", authMiddleware, bookingFeedback);
+router.get("/:id", authMiddleware, isAdmin, getaUser);
+router.post("/corporate-pods", corporatePods);
+router.post('/extend/:bookingId', authMiddleware, extendBooking);
+
 
 router.put(
   "/auto-update-booking-status",
@@ -81,6 +109,7 @@ router.put(
 
 router.post("/rate-booking/:id", authMiddleware, rateBooking);
 
-router.put("/notification", authMiddleware, sendNotification);
+router.get("/notifications/active", authMiddleware, getAllNotification);
+router.put("/notification/send", authMiddleware, sendNotification);
 
 module.exports = router;

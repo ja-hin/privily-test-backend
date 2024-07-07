@@ -1,9 +1,9 @@
-const mongoose = require("mongoose"); // Erase if already required
+const mongoose = require("mongoose");
 
 // Declare the Schema of the Mongo model
 var productSchema = new mongoose.Schema(
   {
-    productId: {
+    deviceId: {
       type: String,
       required: true,
     },
@@ -12,66 +12,45 @@ var productSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
     slug: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
     },
-
     description: {
       type: String,
       required: true,
     },
-
-    location: {
-      lat: {
-        type: Number,
-        required: true,
-        max: 180,
-        min: -180,
-      },
-      lon: {
-        type: Number,
-        required: true,
-        max: 180,
-        min: -180,
-      },
-    },
-
-    address: {
-      line1: {
-        type: String,
-        required: true,
-      },
-      line2: {
-        type: String,
-        required: true,
-      },
-      city: {
-        type: String,
-        required: true,
-      },
-      state: {
-        type: String,
-        required: true,
-      },
-      country: {
-        type: String,
-        required: true,
-      },
-      zip: {
-        type: String,
-        required: true,
-      },
-    },
-
-    category: {
-      type: String, // [Desk, MeetingRoom, PrivateOffice, Event and Lifestyle]
+    booking_requirements: {
+      type: String,
       required: true,
     },
-
+    cancellation_policy: {
+      type: String,
+      required: true,
+    },
+    availability: {
+      type: String,
+      required: true,
+    },
+    location: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Location",
+      required: true,
+    },
+    features: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Features",
+        required: true,
+      },
+    ],
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "PCategory",
+      required: true,
+    },
     timeSlot: {
       type: String,
       required: true,
@@ -81,29 +60,13 @@ var productSchema = new mongoose.Schema(
       required: true,
       default: true,
     },
-
-    features: [
-      // { feature: "Ventilated", value: "value1" },
-      // { feature: "Sound Proof", value: "value2" },
-      // { feature: "Comfortable Seating", value: "value3" },
-      // { feature: "Wifi from hosting facility", value: "value4" },
-      // { feature: "Electric Connection", value: "value5" },
-
-      {
-        feature: String,
-        value: String,
-      },
-    ],
-
     images: [
       {
         public_id: String,
         url: String,
       },
     ],
-
     tags: String,
-
     ratings: [
       {
         star: Number,
@@ -111,8 +74,8 @@ var productSchema = new mongoose.Schema(
         postedby: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       },
     ],
-    ratingCount: {
-      type: Number,
+    UserId: {
+      type: String,
       default: 0,
     },
     totalRating: {
@@ -123,5 +86,5 @@ var productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-//Export the model
+// Export the model
 module.exports = mongoose.model("Product", productSchema);

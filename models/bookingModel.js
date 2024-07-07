@@ -1,3 +1,5 @@
+//models/bookingModel.js
+
 const mongoose = require("mongoose");
 
 const bookingSchema = new mongoose.Schema(
@@ -16,6 +18,9 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    description: {
+      type: String,
+    },
     bookingDate: {
       type: Date,
       require: true,
@@ -29,6 +34,10 @@ const bookingSchema = new mongoose.Schema(
       required: true,
     },
     timeSlotNumber: {
+      type: String,
+      required: true,
+    },
+    qrCodeData:{
       type: String,
       required: true,
     },
@@ -48,6 +57,11 @@ const bookingSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    feedback: 
+    {
+      rating: { type: Number },
+      message: { type: String }
+  }
 
     // totalCost: {
     //   type: Number,

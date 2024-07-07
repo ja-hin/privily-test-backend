@@ -9,6 +9,12 @@ const jwt = require("jsonwebtoken");
 const { sendEmail } = require("./emailCtrl");
 const twilio = require("twilio");
 const MobileUserModel = require("../models/mobileUserModel");
+const ProductAvailability = require("../models/productAvailability");
+const { START_TIME, END_TIME } = require("./constants");
+const Corporate = require("../models/corporateModel");
+const moment = require("moment-timezone");
+const productModel = require("../models/productModel");
+const registerstaff = require("../models/registerstaff");
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -16,49 +22,296 @@ const twilioClient = twilio(
 );
 
 // Create a User
-const createUser = asyncHandler(async (req, res) => {
-  const email = req.body.email;
-  const findUser = await User.findOne({ email: email });
+// const createUser = asyncHandler(async (req, res) => {
+//   const email = req.body.email;
+//   const findUser = await User.findOne({ email: email });
 
-  if (!findUser) {
-    const newUser = await User.create(req.body);
-    res.json(newUser);
-  } else {
-    throw new Error("User Already Exists");
+//   if (!findUser) {
+//     const newUser = await User.create(req.body);
+//     res.json(newUser);
+//   } else {
+//     throw new Error("User Already Exists");
+//   }
+// });
+const createUser = asyncHandler(async (req, res) => {
+  const { email, mobile, firstname, lastname } = req.body;
+
+  if (!email || !mobile || !firstname || !lastname) {
+    return res.status(400).send("All fields are required");
   }
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return res.status(400).send("User already exists");
+  }
+
+  try {
+    const newUser = new User({
+      email,
+      mobile,
+      firstname,
+      lastname,
+      // password field is not included
+    });
+    await newUser.save();
+    console.log("user registered");
+    const token = generateToken(newUser._id);
+    res.json({
+      message: "User registered successfully",
+      token,
+      userId: newUser._id,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Failed to register user");
+  }
+});
+
+// const addRoles = asyncHandler(async (req, res) => {
+//   const { id, role } = req.body;
+
+//   if (!id || !Array.isArray(role)) {
+//     return res.status(400).send("Invalid request body");
+//   }
+
+//   try {
+//     // Find the user by ID and update the auth_page field
+//     const user = await User.findById(id);
+
+//     if (!user) {
+//       return res.status(404).send("User not found");
+//     }
+
+//     // Add new roles to auth_page field
+//     user.auth_page = role
+
+//     // Save the updated user document
+//     await user.save();
+
+//     res.status(200).send("Roles added successfully");
+//   } catch (error) {
+//     res.status(500).send("Server error");
+//   }
+// });
+
+// const addRoles = asyncHandler(async (req, res) => {
+//   const { id, role } = req.body;
+
+//   console.log("Request body:", req.body); // Log the request body
+//   try {
+//     validateMongoDbId(id); // Validate the ID before proceeding
+//   } catch (error) {
+//     console.error("Validation error:", error.message); // Log the validation error
+//     return res.status(400).send(error.message);
+//   }
+
+//   if (!id || !Array.isArray(role)) {
+//     return res.status(400).send("Invalid request body");
+//   }
+
+//   try {
+//     // Find the user by ID and update the auth_page field
+//     const user = await User.findById(id);
+//     console.log("User found:", user); // Log the found user
+
+//     if (!user) {
+//       return res.status(404).send("User not found");
+//     }
+
+//     // Add new roles to auth_page field
+//     user.auth_page = role;
+
+//     // Save the updated user document
+//     await user.save();
+
+//     res.status(200).send("Roles added successfully");
+//   } catch (error) {
+//     console.error("Server error:", error); // Log the server error
+//     res.status(500).send("Server error");
+//   }
+// });
+//new..
+
+const registerAndAssignRoles = asyncHandler(async (req, res) => {
+  const { firstname, lastname, email, mobile, password, role, auth_page } =
+    req.body;
+
+  // Validate input
+  if (
+    !firstname ||
+    !lastname ||
+    !email ||
+    !mobile ||
+    !password ||
+    !role ||
+    !auth_page
+  ) {
+    return res.status(400).send("All fields are required");
+  }
+
+  // Check if user already exists
+  const existingUser = await registerstaff.findOne({ email });
+  if (existingUser) {
+    return res.status(400).send("User with this email already exists");
+  }
+
+  // Create new staff member
+  const staffMember = new registerstaff({
+    firstname,
+    lastname,
+    email,
+    mobile,
+    password,
+    role,
+    auth_page,
+  });
+
+  // Save the new staff member
+  await staffMember.save();
+
+  res
+    .status(201)
+    .send("Staff member registered and roles assigned successfully");
 });
 
 // Login a user
+// const loginUserCtrl = asyncHandler(async (req, res) => {
+//   const { email, password } = req.body;
+
+//   // check if user exists or not
+//   const findUser = await registerstaff.findOne({ email });
+//   if (findUser && (await findUser.isPasswordMatched(password))) {
+//     const refreshToken = await generateRefreshToken(findUser?._id);
+//     await registerstaff.findByIdAndUpdate(findUser._id, { refreshToken });
+//     res.cookie("refreshToken", refreshToken, {
+//       httpOnly: true,
+//       maxAge: 72 * 60 * 60 * 1000,
+//     });
+//     res.json({
+//       _id: findStaff._id,
+//       firstname: findStaff.firstname,
+//       lastname: findStaff.lastname,
+//       email: findStaff.email,
+//       mobile: findStaff.mobile,
+//       role: findStaff.role,
+//       auth_page: findStaff.auth_page,
+//       token: generateToken(findStaff._id),
+//     });
+//   } else {
+//     throw new Error("Invalid Credentials");
+//   }
+// });
 const loginUserCtrl = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  // check if user exists or not
-  const findUser = await User.findOne({ email });
-  if (findUser && (await findUser.isPasswordMatched(password))) {
-    const refreshToken = await generateRefreshToken(findUser?._id);
-    const updateuser = await User.findByIdAndUpdate(
-      findUser.id,
-      {
-        refreshToken: refreshToken,
-      },
-      { new: true }
-    );
+
+  // Check if staff exists
+  const findStaff = await registerstaff.findOne({ email });
+  if (findStaff && (await findStaff.isPasswordMatched(password))) {
+    const refreshToken = generateRefreshToken(findStaff._id);
+    await registerstaff.findByIdAndUpdate(findStaff._id, { refreshToken });
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      maxAge: 72 * 60 * 60 * 1000,
+      maxAge: 72 * 60 * 60 * 1000, // 3 days
     });
     res.json({
-      _id: findUser?._id,
-      firstname: findUser?.firstname,
-      lastname: findUser?.lastname,
-      email: findUser?.email,
-      mobile: findUser?.mobile,
-      token: generateToken(findUser?._id),
+      _id: findStaff._id,
+      firstname: findStaff.firstname,
+      lastname: findStaff.lastname,
+      email: findStaff.email,
+      mobile: findStaff.mobile,
+      role: findStaff.role,
+      auth_page: findStaff.auth_page,
+      token: generateToken(findStaff._id),
     });
   } else {
-    throw new Error("Invalid Credentials");
+    res.status(401).send("Invalid Credentials");
   }
 });
+// const loginMobileUserCtrl = asyncHandler(async (req, res) => {
+//   const { phoneNumber, user } = req.body;
 
+//   if (!phoneNumber || !user) {
+//     return res.status(400).send("Phone number and user ID are required");
+//   }
+
+//   // Check if the user ID exists in the User collection
+//   const userExists = await User.findById(user);
+//   if (!userExists) {
+//     return res.status(400).send("Invalid user ID");
+//   }
+
+//   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+//   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
+
+//   try {
+//     let mobileUser = await MobileUserModel.findOne({ phoneNumber });
+//     if (!mobileUser) {
+//       mobileUser = new MobileUserModel({ phoneNumber, user });
+//     } else {
+//       mobileUser.user = user; // Ensure the user field is updated if it already exists
+//     }
+
+//     mobileUser.otp = otp;
+//     mobileUser.otpExpires = otpExpires;
+//     await mobileUser.save();
+
+//     await twilioClient.messages.create({
+//       body: `Your OTP is ${otp}`,
+//       from: process.env.TWILIO_PHONE_NUMBER,
+//       to: phoneNumber,
+//     });
+
+//     res.send("OTP sent successfully");
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).send("Failed to send OTP");
+//   }
+// });
+// const loginMobileUserCtrl = asyncHandler(async (req, res) => {
+//   const { phoneNumber } = req.body;
+//   if (!phoneNumber) {
+//     return res.status(400).send("Phone number is required");
+//   }
+
+//   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+//   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
+
+//   try {
+//     let mobileUser = await MobileUserModel.findOne({ phoneNumber });
+//     if (!mobileUser) {
+//       mobileUser = new MobileUserModel({ phoneNumber });
+//     }
+
+//     mobileUser.otp = otp;
+//     mobileUser.otpExpires = otpExpires;
+//     await mobileUser.save();
+
+//     await twilioClient.messages.create({
+//       body: `Your OTP is ${otp}`,
+//       from: process.env.TWILIO_PHONE_NUMBER,
+//       to: phoneNumber,
+//     });
+
+//     // res.send("OTP sent successfully");
+
+//     const refreshToken = await generateRefreshToken(mobileUser?.user?._id);
+//     const updateuser = await User.findByIdAndUpdate(
+//       mobileUser?.user?.id,
+//       {
+//         refreshToken: refreshToken,
+//       },
+//       { new: true }
+//     );
+//     res.cookie("refreshToken", refreshToken, {
+//       httpOnly: true,
+//       maxAge: 72 * 60 * 60 * 1000,
+//     });
+//     res.json({token: generateToken(mobileUser?.user?._id)})
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).send("Failed to send OTP");
+//   }
+// });
 const loginMobileUserCtrl = asyncHandler(async (req, res) => {
   const { phoneNumber } = req.body;
   if (!phoneNumber) {
@@ -69,14 +322,14 @@ const loginMobileUserCtrl = asyncHandler(async (req, res) => {
   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
 
   try {
-    let user = await MobileUserModel.findOne({ phoneNumber });
-    if (!user) {
-      user = new MobileUserModel({ phoneNumber });
+    let mobileUser = await MobileUserModel.findOne({ phoneNumber });
+    if (!mobileUser) {
+      mobileUser = new MobileUserModel({ phoneNumber });
     }
 
-    user.otp = otp;
-    user.otpExpires = otpExpires;
-    await user.save();
+    mobileUser.otp = otp;
+    mobileUser.otpExpires = otpExpires;
+    await mobileUser.save();
 
     await twilioClient.messages.create({
       body: `Your OTP is ${otp}`,
@@ -98,13 +351,7 @@ const loginAdmin = asyncHandler(async (req, res) => {
   if (findAdmin.role !== "admin") throw new Error("Not Authorised");
   if (findAdmin && (await findAdmin.isPasswordMatched(password))) {
     const refreshToken = await generateRefreshToken(findAdmin?._id);
-    const updateuser = await User.findByIdAndUpdate(
-      findAdmin.id,
-      {
-        refreshToken: refreshToken,
-      },
-      { new: true }
-    );
+    await User.findByIdAndUpdate(findAdmin._id, { refreshToken });
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       maxAge: 72 * 60 * 60 * 1000,
@@ -122,6 +369,33 @@ const loginAdmin = asyncHandler(async (req, res) => {
   }
 });
 
+// const verifyMobileOtp = asyncHandler(async (req, res) => {
+//   const { phoneNumber, otp } = req.body;
+//   console.log(phoneNumber, otp, "otp")
+//   if (!phoneNumber || !otp) {
+//     return res.status(400).send("Phone number and OTP are required");
+//   }
+
+//   try {
+//     const user = await MobileUserModel.findOne({ phoneNumber });
+//     if (!user) {
+//       return res.status(400).send("User not found");
+//     }
+
+//     if (user.otp !== otp || new Date() > user.otpExpires) {
+//       return res.status(400).send("Invalid or expired OTP");
+//     }
+
+//     user.otp = null;
+//     user.otpExpires = null;
+//     await user.save();
+
+//     res.send("OTP verified successfully");
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).send("Failed to verify OTP");
+//   }
+// });
 const verifyMobileOtp = asyncHandler(async (req, res) => {
   const { phoneNumber, otp } = req.body;
   if (!phoneNumber || !otp) {
@@ -129,23 +403,64 @@ const verifyMobileOtp = asyncHandler(async (req, res) => {
   }
 
   try {
-    const user = await MobileUserModel.findOne({ phoneNumber });
-    if (!user) {
+    const mobileUser = await MobileUserModel.findOne({ phoneNumber });
+    if (!mobileUser) {
       return res.status(400).send("User not found");
     }
 
-    if (user.otp !== otp || new Date() > user.otpExpires) {
+    if (mobileUser.otp !== otp || new Date() > mobileUser.otpExpires) {
       return res.status(400).send("Invalid or expired OTP");
     }
 
-    user.otp = null;
-    user.otpExpires = null;
-    await user.save();
+    mobileUser.otp = null;
+    mobileUser.otpExpires = null;
+    await mobileUser.save();
 
-    res.send("OTP verified successfully");
+    const existingUser = await User.findOne({ mobile: phoneNumber });
+    console.log("existingUser");
+    console.log(existingUser);
+    if (existingUser) {
+      if (existingUser.isBlocked) {
+        return res.status(403).json({ message: "User is blocked" });
+      }
+      const token = generateToken(existingUser._id);
+      res.json({
+        message: "OTP verified successfully",
+        status: 0,
+        token,
+        userId: existingUser._id,
+      });
+    } else {
+      res.json({ message: "OTP verified successfully", status: 1 });
+    }
   } catch (error) {
     console.error(error);
     res.status(500).send("Failed to verify OTP");
+  }
+});
+
+const verifyAuthPage = asyncHandler(async (req, res) => {
+  const { id, auth_page } = req.body;
+
+  if (!id || auth_page === undefined) {
+    return res.status(400).send("Invalid request body");
+  }
+
+  try {
+    // Find the user by ID
+    const user = await registerstaff.findById(id);
+
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    // Check if the auth_page array contains the specified page number
+    const success = user.auth_page.includes(auth_page);
+
+    // Return true if the user has access, otherwise false
+    res.status(200).json({ success });
+  } catch (error) {
+    res.status(500).send("Server error");
   }
 });
 
@@ -157,7 +472,7 @@ const handleRefreshToken = asyncHandler(async (req, res) => {
   const user = await User.findOne({ refreshToken });
   if (!user) throw new Error(" No Refresh token present in db or not matched");
   jwt.verify(refreshToken, process.env.JWT_SECRET, (err, decoded) => {
-    if (err || user.id !== decoded.id) {
+    if (err || user.id.toString() !== decoded.id) {
       throw new Error("There is something wrong with refresh token");
     }
     const accessToken = generateToken(user?._id);
@@ -274,6 +589,68 @@ const getallUser = asyncHandler(async (req, res) => {
     });
   }
 });
+const getallstaff = asyncHandler(async (req, res) => {
+  try {
+    const getstaff = await registerstaff.find();
+    res.json(getstaff);
+  } catch (error) {
+    res.status(500).json({
+      status: "fail",
+      message: "An error occurred while fetching users.",
+    });
+  }
+});
+const blockStaff = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  validateMongoDbId(id); // Make sure this function is correctly implemented
+
+  try {
+    const blockusr = await registerstaff.findByIdAndUpdate(
+      id,
+      { isBlocked: true },
+      { new: true }
+    );
+
+    if (!blockusr) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User blocked successfully" });
+  } catch (error) {
+    console.error("Error blocking user:", error); // Log the error
+    res.status(500).json({ message: error.message });
+  }
+});
+const unblockStaff = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateMongoDbId(id);
+  try {
+    const unblock = await registerstaff.findByIdAndUpdate(
+      id,
+      { isBlocked: false },
+      { new: true }
+    );
+    if (!unblock) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User unblocked successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+const deleteStaff = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateMongoDbId(id);
+  try {
+    const deleteaUser = await registerstaff.findByIdAndDelete(id);
+    res.json({
+      deleteaUser,
+    });
+  } catch (error) {
+    throw new Error(error);
+  }
+});
 
 // Get a single user
 const getaUser = asyncHandler(async (req, res) => {
@@ -304,44 +681,60 @@ const deleteaUser = asyncHandler(async (req, res) => {
 });
 
 //block a user
+// const blockUser = asyncHandler(async (req, res) => {
+//   const { id } = req.params;
+//   validateMongoDbId(id);
+//   try {
+//     const blockusr = await User.findByIdAndUpdate(
+//       id,
+//       { isBlocked: true },
+//       { new: true }
+//     );
+//     if (!blockusr) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+//     res.json({ message: "User blocked successfully" });
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// });
 const blockUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  validateMongoDbId(id);
+
+  validateMongoDbId(id); // Make sure this function is correctly implemented
+
   try {
     const blockusr = await User.findByIdAndUpdate(
       id,
-      {
-        isBlocked: true,
-      },
-      {
-        new: true,
-      }
+      { isBlocked: true },
+      { new: true }
     );
-    res.json(blockusr);
+
+    if (!blockusr) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User blocked successfully" });
   } catch (error) {
-    throw new Error(error);
+    console.error("Error blocking user:", error); // Log the error
+    res.status(500).json({ message: error.message });
   }
 });
 
-//unblock a user
 const unblockUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
   try {
     const unblock = await User.findByIdAndUpdate(
       id,
-      {
-        isBlocked: false,
-      },
-      {
-        new: true,
-      }
+      { isBlocked: false },
+      { new: true }
     );
-    res.json({
-      message: "User UnBlocked",
-    });
+    if (!unblock) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User unblocked successfully" });
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -398,6 +791,35 @@ const resetPassword = asyncHandler(async (req, res) => {
   res.json(user);
 });
 
+//get data of logged user
+const getMe = async (req, res) => {
+  res.json(req.user);
+};
+
+//Get data for corporate pods
+const corporatePods = asyncHandler(async (req, res) => {
+  const { companyName, email, mobile } = req.body;
+
+  const corporate = new Corporate({
+    companyName,
+    email,
+    mobile,
+  });
+
+  // Save the data to the database
+  const savedData = await corporate.save();
+
+  res.status(201).json({
+    message: "Thanks for your Query",
+    corporate: {
+      _id: savedData._id,
+      companyName: savedData.companyName,
+      email: savedData.email,
+      mobile: savedData.mobile,
+    },
+  });
+});
+
 // Apply Coupon on booking total amount
 // const applyCoupon = asyncHandler(async (req, res) => {
 //   const { coupon } = req.body;
@@ -422,37 +844,194 @@ const resetPassword = asyncHandler(async (req, res) => {
 
 // _______________________________________________________________________________________________
 
+// Create availability
+// start_time = 6 // 6 am
+// end_time = 24 // till EOD
+// indexes = (24-6)*60/15
+// data = {
+//   "product_id": id,
+//   "slot_bookings": Array.from({ length: indexes }, () => false),
+//   "available_slot":[]
+// }
+// ProductAvailability.create(data);
+
+// Function to get slot index from time
+function get_slot_index_from_time(time_obj, start_time) {
+  const hours = time_obj.getHours();
+  const minutes = time_obj.getMinutes();
+  return (hours - start_time) * 4 + Math.floor(minutes / 15);
+}
+
 // Create a booking for a user with podId, timeSlot and status as pending by default
+// const createBooking = asyncHandler(async (req, res) => {
+//   const { _id } = req.user;
+//   const { podId } = req.params;
+//   validateMongoDbId(_id);
+//   validateMongoDbId(podId);
+//   try {
+//     const { bookingDate, startTime, endTime, timeSlotNumber, bookingPurpose, description } = req.body;
+
+//     const user = await User.findById(_id);
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     // Convert bookingDate, startTime, and endTime to Date objects in IST
+//     const bookingDateObj = moment.tz(bookingDate, "Asia/Kolkata").toDate();
+//     const startTimeObj = moment.tz(startTime, "Asia/Kolkata").toDate();
+//     const endTimeObj = moment.tz(endTime, "Asia/Kolkata").toDate();
+
+//     // Check for overlapping bookings
+//     const existingBooking = await Booking.findOne({
+//       podId,
+//       status: { $ne: 'Cancelled' },
+//       $or: [
+//         {
+//           $and: [
+//             { startTime: { $lte: startTimeObj } },
+//             { endTime: { $gte: endTimeObj } },
+//           ],
+//         }, // Check if new booking starts during existing booking
+//         {
+//           $and: [
+//             { startTime: { $lte: endTimeObj } },
+//             { endTime: { $gte: endTimeObj } },
+//           ],
+//         }, // Check if new booking ends during existing booking
+//         {
+//           $and: [
+//             { startTime: { $gte: startTimeObj } },
+//             { endTime: { $lte: endTimeObj } },
+//           ],
+//         }, // Check if new booking is completely within existing booking
+//       ],
+//     });
+//     if (existingBooking) {
+//       return res.status(400).json({ message: "Booking with the same date and time already exists" });
+//     }
+
+//     // Generate QR Code Data String
+//     const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000);
+//     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000);
+
+//     // // Calculate IST Unix timestamps by adding the offset (19800 seconds)
+//     // const IST_OFFSET_SECONDS = 19800; // 5 hours and 30 minutes in seconds
+//     // const startTimeIST = startTimeStamp + IST_OFFSET_SECONDS;
+//     // const endTimeIST = endTimeStamp + IST_OFFSET_SECONDS;
+//     const qrCodeDataString = `F2/${process.env.DEVICE_ID}/${process.env.USER_ID}/0/${endTimeStamp}/${startTimeStamp}`;
+
+//     // Create new booking
+//     const newBooking = await Booking.create({
+//       user: user._id,
+//       podId,
+//       bookingDate: bookingDateObj,
+//       startTime: startTimeObj,
+//       endTime: endTimeObj,
+//       timeSlotNumber,
+//       bookingPurpose,
+//       description: description || null ,
+//       status: "Pending",
+//       qrCodeData: qrCodeDataString,
+//       feedback: {
+//         message:null,
+//         rating: null,
+//       }
+//     });
+
+//     user.booking.push(newBooking._id);
+//     await user.save();
+
+//     // Create or update product availability entry
+//     const productAvailability = await ProductAvailability.findOne({
+//       product_id: podId,
+//       booking_date: {
+//         $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
+//         $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
+//       }
+//     });
+
+//     if (productAvailability) {
+//       // Update slot bookings
+//       let updatedSlotBookings = productAvailability.slot_bookings;
+//       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
+//       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+//       for (let i = startingIndex; i < endingIndex; i++) {
+//         updatedSlotBookings[i] = true;
+//       }
+
+//       await ProductAvailability.findOneAndUpdate({_id:productAvailability._id}, {slot_bookings: updatedSlotBookings}, { new: true });
+//     } else {
+//       // Create new product availability entry
+//       const indexes = (END_TIME - START_TIME) * 4;
+//       const slotBookings = Array.from({ length: indexes }, () => false);
+//       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
+//       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+
+//       for (let i = startingIndex; i < endingIndex; i++) {
+//         slotBookings[i] = true;
+//       }
+
+//       const data = {
+//         product_id: podId,
+//         slot_bookings: slotBookings,
+//         booking_date: bookingDateObj,
+//       };
+//       await ProductAvailability.create(data);
+//     }
+
+//     // Convert the new booking times to IST for the response
+//     const responseBooking = {
+//       ...newBooking._doc,
+//       bookingDate: moment(newBooking.bookingDate).tz("Asia/Kolkata").format(),
+//       startTime: moment(newBooking.startTime).tz("Asia/Kolkata").format(),
+//       endTime: moment(newBooking.endTime).tz("Asia/Kolkata").format(),
+//     };
+
+//     sendNotificationOnBooking(user, newBooking);
+//     res.status(201).json({ message: "Booking created successfully", booking: responseBooking });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// });
 const createBooking = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   const { podId } = req.params;
   validateMongoDbId(_id);
   validateMongoDbId(podId);
   try {
-    const { bookingDate, startTime, endTime, timeSlotNumber, bookingPurpose } =
-      req.body;
+    const {
+      bookingDate,
+      startTime,
+      endTime,
+      timeSlotNumber,
+      bookingPurpose,
+      description,
+    } = req.body;
 
     const user = await User.findById(_id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Convert bookingDate, startTime, and endTime to Date objects
-    const bookingDateObj = new Date(bookingDate);
-    const startTimeObj = new Date(startTime);
-    const endTimeObj = new Date(endTime);
+    // Fetch the pod details to get the device ID
+    const pod = await productModel.findById(podId);
+    if (!pod) {
+      return res.status(404).json({ message: "Pod not found" });
+    }
 
-    // Convert to IST (add 5 hours and 30 minutes)
-    // bookingDateObj.setHours(bookingDateObj.getHours() + 5);
-    // bookingDateObj.setMinutes(bookingDateObj.getMinutes() + 30);
-    startTimeObj.setHours(startTimeObj.getHours() - 5);
-    startTimeObj.setMinutes(startTimeObj.getMinutes() - 30);
-    endTimeObj.setHours(endTimeObj.getHours() - 5);
-    endTimeObj.setMinutes(endTimeObj.getMinutes() - 30);
+    const deviceId = pod.deviceId;
+    const UserID = pod.UserId;
+
+    // Convert bookingDate, startTime, and endTime to Date objects in IST
+    const bookingDateObj = moment.tz(bookingDate, "Asia/Kolkata").toDate();
+    const startTimeObj = moment.tz(startTime, "Asia/Kolkata").toDate();
+    const endTimeObj = moment.tz(endTime, "Asia/Kolkata").toDate();
 
     // Check for overlapping bookings
     const existingBooking = await Booking.findOne({
       podId,
+      status: { $ne: "Cancelled" },
       $or: [
         {
           $and: [
@@ -474,13 +1053,18 @@ const createBooking = asyncHandler(async (req, res) => {
         }, // Check if new booking is completely within existing booking
       ],
     });
-
     if (existingBooking) {
       return res.status(400).json({
         message: "Booking with the same date and time already exists",
       });
     }
 
+    // Generate QR Code Data String
+    const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000);
+    const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000);
+    const qrCodeDataString = `F2/${deviceId}/${UserID}/0/${endTimeStamp}/${startTimeStamp}`;
+
+    // Create new booking
     const newBooking = await Booking.create({
       user: user._id,
       podId,
@@ -489,43 +1073,112 @@ const createBooking = asyncHandler(async (req, res) => {
       endTime: endTimeObj,
       timeSlotNumber,
       bookingPurpose,
+      description: description || null,
       status: "Pending",
+      qrCodeData: qrCodeDataString,
+      feedback: {
+        message: null,
+        rating: null,
+      },
     });
 
     user.booking.push(newBooking._id);
     await user.save();
-    sendNotificationOnBooking(user._id, newBooking._id);
 
-    res
-      .status(201)
-      .json({ message: "Booking created successfully", booking: newBooking });
+    // Create or update product availability entry
+    const productAvailability = await ProductAvailability.findOne({
+      product_id: podId,
+      booking_date: {
+        $gte: new Date(
+          bookingDateObj.getFullYear(),
+          bookingDateObj.getMonth(),
+          bookingDateObj.getDate()
+        ),
+        $lt: new Date(
+          bookingDateObj.getFullYear(),
+          bookingDateObj.getMonth(),
+          bookingDateObj.getDate() + 1
+        ),
+      },
+    });
+
+    if (productAvailability) {
+      // Update slot bookings
+      let updatedSlotBookings = productAvailability.slot_bookings;
+      const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
+      const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+      for (let i = startingIndex; i < endingIndex; i++) {
+        updatedSlotBookings[i] = true;
+      }
+
+      await ProductAvailability.findOneAndUpdate(
+        { _id: productAvailability._id },
+        { slot_bookings: updatedSlotBookings },
+        { new: true }
+      );
+    } else {
+      // Create new product availability entry
+      const indexes = (END_TIME - START_TIME) * 4;
+      const slotBookings = Array.from({ length: indexes }, () => false);
+      const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
+      const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+
+      for (let i = startingIndex; i < endingIndex; i++) {
+        slotBookings[i] = true;
+      }
+
+      const data = {
+        product_id: podId,
+        slot_bookings: slotBookings,
+        booking_date: bookingDateObj,
+      };
+      await ProductAvailability.create(data);
+    }
+
+    // Convert the new booking times to IST for the response
+    const responseBooking = {
+      ...newBooking._doc,
+      bookingDate: moment(newBooking.bookingDate).tz("Asia/Kolkata").format(),
+      startTime: moment(newBooking.startTime).tz("Asia/Kolkata").format(),
+      endTime: moment(newBooking.endTime).tz("Asia/Kolkata").format(),
+    };
+
+    sendNotificationOnBooking(user, newBooking);
+    res.status(201).json({
+      message: "Booking created successfully",
+      booking: responseBooking,
+    });
   } catch (error) {
-    console.error(error); // Log the error for debugging purposes
+    console.error(error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
-const sendNotificationOnBooking = asyncHandler(async (userId, bookingId) => {
-  validateMongoDbId(userId);
-  validateMongoDbId(bookingId);
-  try {
-    const user = await User.findById(userId);
-    if (!user) throw new Error("User not found");
+const sendNotificationOnBooking = asyncHandler(
+  async (user = null, booking, userId = null) => {
+    try {
+      if (!user && !userId) {
+        throw new Error("Any one of User or UserId is required");
+      }
+      if (!user) {
+        user = await User.findById(userId);
+      }
+      if (!user) throw new Error("User not found");
 
-    const booking = await Booking.findById(bookingId).populate("podId");
-    if (!booking) throw new Error("Booking not found");
+      booking = booking.populate("podId");
+      if (!booking) throw new Error("Booking not found");
 
-    // Format booking date and times
-    const formattedBookingDate = booking.bookingDate.toDateString();
-    const formattedStartTime = booking.startTime.toLocaleTimeString("en-US", {
-      hour12: true,
-    });
-    const formattedEndTime = booking.endTime.toLocaleTimeString("en-US", {
-      hour12: true,
-    });
+      // Format booking date and times
+      const formattedBookingDate = booking.bookingDate.toDateString();
+      const formattedStartTime = moment(booking.startTime)
+        .tz("Asia/Kolkata")
+        .format("hh:mm A");
+      const formattedEndTime = moment(booking.endTime)
+        .tz("Asia/Kolkata")
+        .format("hh:mm A");
 
-    // Construct email content
-    const emailContent = `
+      // Construct email content
+      const emailContent = `
       <p>Hi ${user.firstname},</p>
       <p>Your booking details:</p>
       <ul>
@@ -533,32 +1186,146 @@ const sendNotificationOnBooking = asyncHandler(async (userId, bookingId) => {
         <li><strong>Booking Date:</strong> ${formattedBookingDate}</li>
         <li><strong>Start Time:</strong> ${formattedStartTime}</li>
         <li><strong>End Time:</strong> ${formattedEndTime}</li>
-        <li><strong>Pod ID:</strong> ${booking.podId.name}</li> <!-- Assuming 'name' is the property for pod name -->
-        <!-- Include other necessary details -->
+        <li><strong>Pod ID:</strong> ${booking.podId}</li>
       </ul>
       <p>Thank you for booking with us!</p>
     `;
 
-    // Send email
-    const data = {
-      to: user.email,
-      subject: "Booking Notification",
-      html: emailContent,
-    };
-    await sendEmail(data.to, data.subject, data.html);
+      // Send email
+      const data = {
+        to: user.email,
+        subject: "Booking Notification",
+        html: emailContent,
+      };
+      await sendEmail(data.to, data.subject, data.html);
+      console.log("Email sent successfully.");
+    } catch (error) {
+      console.error("Error sending notification:", error.message);
+      throw new Error("Failed to send notification");
+    }
+  }
+);
 
-    console.log("Email sent successfully."); // Log success
+//extend booking time
+const extendBooking = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { extensionMinutes } = req.body; // Expecting the requested extension time in minutes
+
+  validateMongoDbId(bookingId);
+
+  try {
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    const podId = booking.podId;
+    const endTimeObj = new Date(booking.endTime);
+
+    // Fetch ProductAvailability for the given date
+    const bookingDateObj = new Date(booking.bookingDate);
+    let productAvailability = await ProductAvailability.findOne({
+      product_id: podId,
+      booking_date: {
+        $gte: new Date(
+          bookingDateObj.getFullYear(),
+          bookingDateObj.getMonth(),
+          bookingDateObj.getDate()
+        ),
+        $lt: new Date(
+          bookingDateObj.getFullYear(),
+          bookingDateObj.getMonth(),
+          bookingDateObj.getDate() + 1
+        ),
+      },
+    });
+
+    if (!productAvailability) {
+      const indexes = (END_TIME - START_TIME) * 4;
+      const slotBookings = Array.from({ length: indexes }, () => false);
+      productAvailability = new ProductAvailability({
+        product_id: podId,
+        slot_bookings: slotBookings,
+        booking_date: bookingDateObj,
+      });
+      await productAvailability.save();
+    }
+
+    // Calculate the new end time
+    const newEndTimeObj = new Date(
+      endTimeObj.getTime() + extensionMinutes * 60000
+    );
+    const currentEndingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+    const newEndingIndex = get_slot_index_from_time(newEndTimeObj, START_TIME);
+
+    // Update slot bookings in ProductAvailability
+    const slotBookings = productAvailability.slot_bookings;
+    for (let i = currentEndingIndex; i < newEndingIndex; i++) {
+      if (slotBookings[i]) {
+        return res.status(400).json({
+          message: "Slot not available for the requested extension time.",
+        });
+      }
+      slotBookings[i] = true;
+    }
+
+    await ProductAvailability.findOneAndUpdate(
+      { _id: productAvailability._id },
+      { slot_bookings: slotBookings },
+      { new: true }
+    );
+
+    // Update booking endTime
+    booking.endTime = newEndTimeObj;
+    booking.qrCodeData = `F2/33346/629039/0/${Math.floor(
+      newEndTimeObj.getTime() / 1000
+    )}/${Math.floor(new Date(booking.startTime).getTime() / 1000)}`;
+    await booking.save();
+
+    // Convert the updated booking times to IST for the response
+    const responseBooking = {
+      ...booking._doc,
+      bookingDate: moment(booking.bookingDate).tz("Asia/Kolkata").format(),
+      startTime: moment(booking.startTime).tz("Asia/Kolkata").format(),
+      endTime: moment(booking.endTime).tz("Asia/Kolkata").format(),
+    };
+
+    return res.status(200).json({
+      message: "Booking extended successfully",
+      booking: responseBooking,
+    });
   } catch (error) {
-    console.error("Error sending notification:", error.message);
-    throw new Error("Failed to send notification");
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
 // get all bookings for a user
+// const getBookingsByUser = asyncHandler(async (req, res) => {
+//   const { _id } = req.user;
+//   validateMongoDbId(_id);
+//   try {
+//     const user = await User.findById(_id).populate("booking");
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+//     const bookings = user.booking;
+//     res.json(bookings);
+//   } catch (error) {
+//     console.error("Error fetching bookings by user:", error); // Log the error for debugging
+//     res.status(500).json({
+//       status: "fail",
+//       message: "An error occurred while fetching bookings by user.",
+//     });
+//   }
+// });
 const getBookingsByUser = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
   try {
+    // Call updateBookingStatusAutomatically function
+    await updateBookingStatusAutomatically(req, res, async () => { });
+
     const user = await User.findById(_id).populate("booking");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -575,8 +1342,19 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
 });
 
 // Get all bookings for admin to manage and update status of booking as per the status
+// const getBookings = asyncHandler(async (req, res) => {
+//   try {
+//     const allBookings = await Booking.find();
+//     res.json(allBookings);
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
 const getBookings = asyncHandler(async (req, res) => {
   try {
+    // Call updateBookingStatusAutomatically function
+    await updateBookingStatusAutomatically(req, res, async () => { });
+
     const allBookings = await Booking.find();
     res.json(allBookings);
   } catch (error) {
@@ -691,7 +1469,6 @@ const cancelBooking = asyncHandler(async (req, res) => {
     }
     // Check if booking's start time is within the last 5 minutes
     const fiveMinutesAgo = new Date(new Date() - 300 * 1000);
-
     if (booking.startTime < fiveMinutesAgo) {
       return res.status(403).json({
         message: "Cannot cancel booking Before 5 Minutes of start time",
@@ -704,11 +1481,102 @@ const cancelBooking = asyncHandler(async (req, res) => {
     booking.isBookingActive = false;
     await booking.save();
 
+    // Update product availability
+    const productAvailability = await ProductAvailability.findOne({
+      product_id: booking.podId,
+      booking_date: {
+        $gte: new Date(
+          booking.bookingDate.getFullYear(),
+          booking.bookingDate.getMonth(),
+          booking.bookingDate.getDate()
+        ),
+        $lt: new Date(
+          booking.bookingDate.getFullYear(),
+          booking.bookingDate.getMonth(),
+          booking.bookingDate.getDate() + 1
+        ),
+      },
+    });
+
+    if (productAvailability) {
+      let updatedSlotBookings = productAvailability.slot_bookings;
+      const startingIndex = get_slot_index_from_time(
+        booking.startTime,
+        START_TIME
+      );
+      const endingIndex = get_slot_index_from_time(booking.endTime, START_TIME);
+      for (let i = startingIndex; i < endingIndex; i++) {
+        updatedSlotBookings[i] = false;
+      }
+
+      await ProductAvailability.findOneAndUpdate(
+        { _id: productAvailability._id },
+        { slot_bookings: updatedSlotBookings },
+        { new: true }
+      );
+    }
+
     res.json({ message: "Booking cancelled successfully", booking });
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
+
+// const cancelBooking = asyncHandler(async (req, res) => {
+//   const { id } = req.params;
+//   validateMongoDbId(id);
+//   try {
+//     const booking = await Booking.findById(id);
+
+//     if (!booking) {
+//       return res.status(404).json({ message: "Booking not found" });
+//     }
+//     if (booking.status !== "Pending" && booking.status !== "Confirmed") {
+//       return res.status(403).json({
+//         message:
+//           "Cannot cancel booking with status other than Pending or Confirmed",
+//       });
+//     }
+//     // Check if booking's start time is within the last 5 minutes
+//     const fiveMinutesAgo = new Date(new Date() - 300 * 1000);
+//     console.log(fiveMinutesAgo, 'timing')
+//     console.log(booking.startTime, "start Time")
+//     if (booking.startTime < fiveMinutesAgo) {
+//       return res.status(403).json({
+//         message: "Cannot cancel booking Before 5 Minutes of start time",
+//       });
+//     }
+
+//     // If status is pending or confirmed, update status to "Cancelled"
+//     booking.status = "Cancelled";
+//     sendNotificationOnCancel(booking.user._id, booking._id);
+//     booking.isBookingActive = false;
+//     await booking.save();
+
+//     res.json({ message: "Booking cancelled successfully", booking });
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
+
+const bookingFeedback = asyncHandler(async (req, res) => {
+  try {
+    const booking_id = req.params.id;
+    const { message, rating } = req.body;
+    await Booking.findById(booking_id);
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      booking_id,
+      { "feedback.rating": rating, "feedback.message": message },
+      {
+        new: true,
+      }
+    );
+    res.json(updatedBooking);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
   validateMongoDbId(userId);
   validateMongoDbId(bookingId);
@@ -768,7 +1636,53 @@ const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
 });
 
 //update booking auromatically when current time is equal to or greater than booking start time
-const updateBookingStatusAutomatically = asyncHandler(async (req, res) => {
+// const updateBookingStatusAutomatically = asyncHandler(async (req, res) => {
+//   const { _id } = req.user;
+//   validateMongoDbId(_id);
+
+//   try {
+//     const now = new Date();
+
+//     console.log("Current Time:", now);
+
+//     // Find pending bookings
+//     const pendingBookings = await Booking.find({
+//       user: _id,
+//       isBookingActive: true,
+//       status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] }, // Use $nin operator to exclude multiple statuses
+//       endTime: { $lte: now }, // Find bookings where endTime is less than or equal to now
+//     }).populate("user");
+
+//     // console.log("Pending Bookings:", pendingBookings);
+//     // Update completed bookings status to "Completed"
+//     const updatedCompletedBookings = await Promise.all(
+//       pendingBookings.map(async (booking) => {
+//         console.log(booking.startTime);
+//         console.log(booking.endTime);
+
+//         if (booking.endTime <= now) {
+//           // Use endTime directly for comparison
+//           booking.status = "Completed";
+//         }
+//         if (booking.startTime <= now && now <= booking.endTime) {
+//           // Check if now is within booking's start and end time
+//           booking.status = "Processing";
+//         }
+//         return await booking.save();
+//       })
+//     );
+
+//     // Send the response
+//     res.json({
+//       message: "Booking status updated successfully",
+//       updatedCompletedBookings,
+//     });
+//   } catch (error) {
+//     console.error("Error updating booking status:", error);
+//     res.status(500).json({ message: "Failed to update booking status" });
+//   }
+// });
+const updateBookingStatusAutomatically = async (req, res, next) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
 
@@ -777,43 +1691,46 @@ const updateBookingStatusAutomatically = asyncHandler(async (req, res) => {
 
     console.log("Current Time:", now);
 
-    // Find pending bookings
-    const pendingBookings = await Booking.find({
+    // Find all active bookings
+    const bookings = await Booking.find({
       user: _id,
       isBookingActive: true,
-      status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] }, // Use $nin operator to exclude multiple statuses
-      endTime: { $lte: now }, // Find bookings where endTime is less than or equal to now
+      status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] },
     }).populate("user");
 
-    // console.log("Pending Bookings:", pendingBookings);
-    // Update completed bookings status to "Completed"
-    const updatedCompletedBookings = await Promise.all(
-      pendingBookings.map(async (booking) => {
-        console.log(booking.startTime);
-        console.log(booking.endTime);
-
-        if (booking.endTime <= now) {
-          // Use endTime directly for comparison
-          booking.status = "Completed";
-        }
-        if (booking.startTime <= now && now <= booking.endTime) {
+    // Update booking statuses
+    const updatedBookings = await Promise.all(
+      bookings.map(async (booking) => {
+        if (booking.startTime <= now && now < booking.endTime) {
           // Check if now is within booking's start and end time
           booking.status = "Processing";
+        } else if (now >= booking.endTime) {
+          // Check if now is past the booking's end time
+          booking.status = "Completed";
+          booking.isBookingActive = false; // Mark booking as inactive
         }
         return await booking.save();
       })
     );
 
-    // Send the response
-    res.json({
-      message: "Booking status updated successfully",
-      updatedCompletedBookings,
-    });
+    if (next) {
+      next();
+    } else {
+      // Send the response
+      res.json({
+        message: "Booking status updated successfully",
+        updatedBookings,
+      });
+    }
   } catch (error) {
     console.error("Error updating booking status:", error);
-    res.status(500).json({ message: "Failed to update booking status" });
+    if (next) {
+      next(error);
+    } else {
+      res.status(500).json({ message: "Failed to update booking status" });
+    }
   }
-});
+};
 
 // rating a booking after completion of booking by user if status is Completed
 const rateBooking = asyncHandler(async (req, res) => {
@@ -824,7 +1741,6 @@ const rateBooking = asyncHandler(async (req, res) => {
       .populate("user")
       .populate("podId")
       .exec();
-
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
@@ -835,31 +1751,48 @@ const rateBooking = asyncHandler(async (req, res) => {
     } else if (booking.isBookingActive === false) {
       return res.status(400).json({ message: "Booking is already rated." });
     }
-    const { rating, comments } = req.body;
+
+    const product = booking.podId;
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const { rating, message } = req.body;
+    booking.feedback = {
+      rating,
+      message,
+    };
+
+    if (!product.ratings) {
+      product.ratings = [];
+    }
+
     const newRating = {
       star: rating,
-      comment: comments,
+      comment: message,
       postedby: booking.user._id,
     };
-    booking.podId.ratings.push(newRating);
+    product.ratings.push(newRating);
 
     let totalRating = 0;
-    booking.podId.ratings.forEach((rating) => {
+    product.ratings.forEach((rating) => {
       totalRating += rating.star;
     });
-    booking.podId.ratingCount = booking.podId.ratings.length;
-    booking.podId.totalRating = totalRating / booking.podId.ratingCount;
+    product.ratingCount = product.ratings.length;
+    product.totalRating = totalRating / product.ratingCount;
 
-    booking.rating = newRating;
-    sendNotification();
+    // Notify the user about the rating
+    sendNotification(req, res);
+
     booking.status = "Rated";
     booking.isBookingActive = false;
-
     await booking.save();
+    await product.save();
 
-    res.json(booking);
+    res.json({ message: "Successfully Rated" });
   } catch (error) {
-    throw new Error(error);
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -929,11 +1862,33 @@ const sendNotification = asyncHandler(async (req, res) => {
   }
 });
 
+const getAllNotification = asyncHandler(async (req, res) => {
+  const user = req.user;
+  await updateBookingStatusAutomatically(req, res, async () => { });
+  const bookings = await Booking.find({
+    user: user._id,
+    status: "Completed",
+  });
+  result = { data: [] };
+  bookings.forEach((booking) => {
+    result["data"].push({
+      message:
+        "This is regarding your last booking on " +
+        booking.bookingDate.toString(),
+      booking_id: booking._id,
+      icon: "icon to send",
+      type: "Rating", // as per this type, frontend will redirect to feedback mark page.
+    });
+  });
+  res.json(result);
+});
+
 module.exports = {
   createUser,
   loginUserCtrl,
   loginMobileUserCtrl,
   verifyMobileOtp,
+  verifyAuthPage,
   getallUser,
   getaUser,
   deleteaUser,
@@ -959,4 +1914,14 @@ module.exports = {
   setCurrentLocation,
   sendNotification,
   rateBooking,
+  bookingFeedback,
+  corporatePods,
+  getAllNotification,
+  getMe,
+  extendBooking,
+  registerAndAssignRoles,
+  getallstaff,
+  blockStaff,
+  unblockStaff,
+  deleteStaff,
 };

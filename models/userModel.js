@@ -25,7 +25,6 @@ var userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
     },
     role: {
       type: String,
@@ -75,6 +74,9 @@ var userSchema = new mongoose.Schema(
         },
       },
     ],
+    auth_page: {
+      type: [Number], // Array of numbers
+    },
     // booking model connect
     booking: [
       {
