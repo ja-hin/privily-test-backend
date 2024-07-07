@@ -589,6 +589,68 @@ const getallUser = asyncHandler(async (req, res) => {
     });
   }
 });
+const getallstaff = asyncHandler(async (req, res) => {
+  try {
+    const getstaff = await registerstaff.find();
+    res.json(getstaff);
+  } catch (error) {
+    res.status(500).json({
+      status: "fail",
+      message: "An error occurred while fetching users.",
+    });
+  }
+});
+const blockStaff = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  validateMongoDbId(id); // Make sure this function is correctly implemented
+
+  try {
+    const blockusr = await registerstaff.findByIdAndUpdate(
+      id,
+      { isBlocked: true },
+      { new: true }
+    );
+
+    if (!blockusr) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User blocked successfully" });
+  } catch (error) {
+    console.error("Error blocking user:", error); // Log the error
+    res.status(500).json({ message: error.message });
+  }
+});
+const unblockStaff = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateMongoDbId(id);
+  try {
+    const unblock = await registerstaff.findByIdAndUpdate(
+      id,
+      { isBlocked: false },
+      { new: true }
+    );
+    if (!unblock) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User unblocked successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+const deleteStaff = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateMongoDbId(id);
+  try {
+    const deleteaUser = await registerstaff.findByIdAndDelete(id);
+    res.json({
+      deleteaUser,
+    });
+  } catch (error) {
+    throw new Error(error);
+  }
+});
 
 // Get a single user
 const getaUser = asyncHandler(async (req, res) => {
@@ -1858,4 +1920,8 @@ module.exports = {
   getMe,
   extendBooking,
   registerAndAssignRoles,
+  getallstaff,
+  blockStaff,
+  unblockStaff,
+  deleteStaff,
 };

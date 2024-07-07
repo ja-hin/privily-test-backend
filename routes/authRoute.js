@@ -38,9 +38,14 @@ const {
   extendBooking,
   registerAndAssignRoles,
   verifyAuthPage,
+  getallstaff,
+  blockStaff,
+  unblockStaff,
+  deleteStaff,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
+const { createPayment } = require("../controller/PaymentCtrl");
 
 const router = express.Router();
 
@@ -54,14 +59,20 @@ router.post("/verify-page", verifyAuthPage);
 router.post("/register-staff", registerAndAssignRoles);
 router.get("/logout", logout);
 router.post("/admin-login", loginAdmin);
-
+router.post("/create-payment", createPayment);
 router.post("/forgot-password-token", forgotPasswordToken);
 router.put("/reset-password/:token", resetPassword);
 router.put("/password", authMiddleware, updatePassword);
 router.get("/refresh", handleRefreshToken);
 
 router.get("/all-users", authMiddleware, isAdmin, getallUser);
+router.get("/all-staff", authMiddleware, isAdmin, getallstaff);
+router.put("/block-staff/:id", authMiddleware, isAdmin, blockStaff);
+router.put("/unblock-staff/:id", authMiddleware, isAdmin, unblockStaff);
+
+
 router.delete("/:id", authMiddleware, isAdmin, deleteaUser);
+router.delete("/delete-staff/:id", authMiddleware, isAdmin, deleteStaff);
 router.put("/edit-user", authMiddleware, updatedUser);
 router.put("/save-address", authMiddleware, saveAddress);
 router.put("/current-location", authMiddleware, setCurrentLocation);

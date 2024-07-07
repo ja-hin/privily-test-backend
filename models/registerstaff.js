@@ -30,6 +30,10 @@ const staffSchema = new mongoose.Schema(
       type: String,
       default: "staff",
     },
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
     auth_page: {
       type: [String], // Array of roles (could be strings like "admin", "editor", etc.)
     },

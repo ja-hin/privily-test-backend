@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.get("/", getAllLocations);
 router.get("/details", getAllLocationsDetails);
-router.post("/create", authMiddleware, isAdmin, createLocations);
+router.post("/create",  createLocations);
 router.get("/features", getAllFeaturesDetails);
 router.post("/create-features", authMiddleware, isAdmin, createFeature);
 router.put("/block-features/:id", authMiddleware, isAdmin, blockFeature);

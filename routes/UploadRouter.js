@@ -62,13 +62,15 @@
 
 // module.exports = router;
 
+
+
+
 const express = require("express");
 const multer = require("multer");
-const path = require("path");
-const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { GridFsStorage } = require("multer-gridfs-storage");
 const Grid = require("gridfs-stream");
+const path = require("path");
 
 const router = express.Router();
 
@@ -83,7 +85,6 @@ const conn = mongoose.createConnection(mongoURI, {
 
 // Init gfs
 let gfs;
-
 conn.once("open", () => {
   // Init stream
   gfs = Grid(conn.db, mongoose.mongo);
@@ -95,17 +96,13 @@ const storage = new GridFsStorage({
   url: mongoURI,
   file: (req, file) => {
     return new Promise((resolve, reject) => {
-      crypto.randomBytes(16, (err, buf) => {
-        if (err) {
-          return reject(err);
-        }
-        const filename = buf.toString("hex") + path.extname(file.originalname);
-        const fileInfo = {
-          filename: filename,
-          bucketName: "uploads",
-        };
-        resolve(fileInfo);
-      });
+      const filename =
+        file.fieldname + "-" + Date.now() + path.extname(file.originalname);
+      const fileInfo = {
+        filename: filename,
+        bucketName: "uploads",
+      };
+      resolve(fileInfo);
     });
   },
 });
@@ -146,8 +143,7 @@ router.post("/upload", (req, res) => {
         res.json({
           message: "Files Uploaded!",
           files: req.files.map((file) => ({
-            filename: file.filename,
-            id: file.id,
+            url: `/file/${file.filename}`,
           })),
         });
       }
@@ -155,26 +151,22 @@ router.post("/upload", (req, res) => {
   });
 });
 
-// Endpoint to get image by filename
-router.get("/image/:filename", (req, res) => {
+router.get("/file/:filename", (req, res) => {
   gfs.files.findOne({ filename: req.params.filename }, (err, file) => {
     if (!file || file.length === 0) {
-      return res.status(404).json({ message: "No file exists" });
+      return res.status(404).json({ err: "No file exists" });
     }
 
     // Check if image
-    if (
-      file.contentType === "image/jpeg" ||
-      file.contentType === "image/png" ||
-      file.contentType === "image/gif"
-    ) {
+    if (file.contentType === "image/jpeg" || file.contentType === "image/png") {
       // Read output to browser
       const readstream = gfs.createReadStream(file.filename);
       readstream.pipe(res);
     } else {
-      res.status(404).json({ message: "Not an image" });
+      res.status(404).json({ err: "Not an image" });
     }
   });
 });
+
 
 module.exports = router;
