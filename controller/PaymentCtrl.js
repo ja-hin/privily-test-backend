@@ -1,42 +1,38 @@
-// controllers/paymentController.js
 const axios = require("axios");
-const Payment = require("../models/Payment");
-
-const yocoSecretKey = "sk_test_cf22177cvKQB93Qec734ed889edf"; // Replace with your Yoco secret key
 
 const createPayment = async (req, res) => {
-  const { token, amountInCents, currency } = req.body;
-
   try {
     const response = await axios.post(
-      "https://online.yoco.com/v1/charges/",
-      {
-        token,
-        amountInCents,
-        currency,
-      },
+      "https://payments.yoco.com/api/checkouts",
       {
         headers: {
-          "X-Auth-Secret-Key": yocoSecretKey,
+          Authorization: `Bearer ${process.env.YOCO_SECRET_KEY}`,
         },
-      }
+      },
+      {
+        amount: req.body.amount,
+        currency: "ZAR",
+        cancelUrl: req.body.cancelUrl,
+        successUrl: req.body.successUrl,
+        failureUrl: req.body.failureUrl,
+        metadata: req.body.metadata,
+        totalDiscount: req.body.totalDiscount,
+        totalTaxAmount: req.body.totalTaxAmount,
+        subtotalAmount: req.body.subtotalAmount,
+        lineItems: req.body.lineItems,
+      },
+      
     );
 
-    const payment = new Payment({
-      token,
-      amountInCents,
-      currency,
-      status: response.data.status,
-    });
-
-    await payment.save();
-
-    res.send(response.data);
+    res.status(200).json(response.data);
   } catch (error) {
-    res.status(500).send({ error: error.response.data.message });
+    res
+      .status(500)
+      .json({
+        message: "Failed to create checkout",
+        error: error.response.data,
+      });
   }
 };
 
-module.exports = {
-  createPayment,
-};
+module.exports = { createPayment };

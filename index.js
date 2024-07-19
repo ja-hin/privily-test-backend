@@ -13,9 +13,11 @@ const pageRouter = require("./routes/pageRoute")
 const locationRouter = require("./routes/locationRoute");
 const dashBoardRoute = require("./routes/dashBoardRoute");
 const uploadRouter = require("./routes/UploadRouter");
+const Paymentrouter = require("./routes/PaymentRoute")
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const cors = require("cors");
+const { createPayment } = require("./controller/PaymentCtrl");
 
 dbConnect();
 app.use(morgan("dev"));
@@ -32,6 +34,8 @@ app.use("/api/pages", pageRouter)
 app.use("/api/location", locationRouter);
 app.use("/api/dashboard", dashBoardRoute);
 app.use("/api", uploadRouter);
+app.use("/api/payments", Paymentrouter);
+
 
 app.use(notFound);
 app.use(errorHandler);
