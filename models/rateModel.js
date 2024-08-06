@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 // Declare the Schema of the Mongo model
-var RateSchema = new mongoose.Schema({
+var rateSchema = new mongoose.Schema({
   
   rate: {
     type: String,
@@ -11,4 +11,4 @@ var RateSchema = new mongoose.Schema({
 });
 
 // Export the model
-module.exports = mongoose.model("Rates", RateSchema);
+module.exports = mongoose.model("rates", rateSchema);
