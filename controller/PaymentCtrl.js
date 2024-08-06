@@ -46,7 +46,7 @@ const axios = require("axios");
 const createPayment = async (req, res) => {
   try {
     const response = await axios.post(
-      `${YOCO_URL}`,
+      "https://payments.yoco.com/api/checkouts",
       {
         amount: req.body.amount,
         currency: "ZAR",
@@ -76,7 +76,10 @@ const createPayment = async (req, res) => {
       status: response.data.status,
     };
 
-    await axios.post("http://localhost:4000/api/transactions", transactionData);
+    await axios.post(
+      "https://hammerhead-app-lqsdj.ondigitalocean.app/api/transactions",
+      transactionData
+    );
 
     res.status(200).json(response.data);
   } catch (error) {
