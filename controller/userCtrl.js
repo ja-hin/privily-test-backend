@@ -15,6 +15,8 @@ const Corporate = require("../models/corporateModel");
 const moment = require("moment-timezone");
 const productModel = require("../models/productModel");
 const registerstaff = require("../models/registerstaff");
+const bcrypt = require("bcrypt");
+const { register } = require("module");
 
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -227,6 +229,7 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
     res.status(401).send("Invalid Credentials");
   }
 });
+
 // const loginMobileUserCtrl = asyncHandler(async (req, res) => {
 //   const { phoneNumber, user } = req.body;
 
@@ -638,6 +641,90 @@ const unblockStaff = asyncHandler(async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// const editStaff = asyncHandler(async (req, res) => {
+//   const { id } = req.params;
+//   const {
+//     firstname,
+//     lastname,
+//     email,
+//     mobile,
+//     password,
+//     role,
+//     auth_page,
+//     isBlocked,
+//   } = req.body;
+
+//   validateMongoDbId(id);
+
+//   try {
+//     const updatedData = {
+//       firstname,
+//       lastname,
+//       email,
+//       mobile,
+//       role,
+//       auth_page,
+//       isBlocked,
+//     };
+
+//     // If password is provided, hash it before saving
+//     if (password) {
+//       const salt = await bcrypt.genSaltSync(10);
+//       updatedData.password = await bcrypt.hash(password, salt);
+//     }
+
+//     const updatedStaff = await registerstaff.findByIdAndUpdate(
+//       id,
+//       updatedData,
+//       {
+//         new: true,
+//         runValidators: true,
+//       }
+//     );
+
+//     if (!updatedStaff) {
+//       return res.status(404).json({ message: "Staff member not found" });
+//     }
+
+//     res.json({ message: "Staff member updated successfully", updatedStaff });
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// });
+
+const editStaff = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { firstname, lastname, email, mobile, password, role, auth_page } =
+    req.body;
+
+  validateMongoDbId(id);
+
+  try {
+    const staffMember = await registerstaff.findById(id);
+    if (!staffMember) {
+      return res.status(404).json({ message: "Staff member not found" });
+    }
+
+    // Update fields
+    staffMember.firstname = firstname || staffMember.firstname;
+    staffMember.lastname = lastname || staffMember.lastname;
+    staffMember.email = email || staffMember.email;
+    staffMember.mobile = mobile || staffMember.mobile;
+    staffMember.role = role || staffMember.role;
+    staffMember.auth_page = auth_page || staffMember.auth_page;
+
+    // If password is provided, it will be hashed by the pre-save hook
+    if (password) {
+      staffMember.password = password;
+    }
+
+    await staffMember.save();
+
+    res.json({ message: "Staff member updated successfully", staffMember });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 const deleteStaff = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -1009,12 +1096,21 @@ const createBooking = asyncHandler(async (req, res) => {
       description,
     } = req.body;
 
+    console.log("Booking creation started:", {
+      _id,
+      podId,
+      bookingDate,
+      startTime,
+      endTime,
+      timeSlotNumber,
+      bookingPurpose,
+    });
+
     const user = await User.findById(_id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Fetch the pod details to get the device ID
     const pod = await productModel.findById(podId);
     if (!pod) {
       return res.status(404).json({ message: "Pod not found" });
@@ -1023,12 +1119,10 @@ const createBooking = asyncHandler(async (req, res) => {
     const deviceId = pod.deviceId;
     const UserID = pod.UserId;
 
-    // Convert bookingDate, startTime, and endTime to Date objects in IST
     const bookingDateObj = moment.tz(bookingDate, "Asia/Kolkata").toDate();
     const startTimeObj = moment.tz(startTime, "Asia/Kolkata").toDate();
     const endTimeObj = moment.tz(endTime, "Asia/Kolkata").toDate();
 
-    // Check for overlapping bookings
     const existingBooking = await Booking.findOne({
       podId,
       status: { $ne: "Cancelled" },
@@ -1038,33 +1132,33 @@ const createBooking = asyncHandler(async (req, res) => {
             { startTime: { $lte: startTimeObj } },
             { endTime: { $gte: endTimeObj } },
           ],
-        }, // Check if new booking starts during existing booking
+        },
         {
           $and: [
             { startTime: { $lte: endTimeObj } },
             { endTime: { $gte: endTimeObj } },
           ],
-        }, // Check if new booking ends during existing booking
+        },
         {
           $and: [
             { startTime: { $gte: startTimeObj } },
             { endTime: { $lte: endTimeObj } },
           ],
-        }, // Check if new booking is completely within existing booking
+        },
       ],
     });
+
     if (existingBooking) {
+      console.log("Duplicate booking detected:", existingBooking);
       return res.status(400).json({
         message: "Booking with the same date and time already exists",
       });
     }
 
-    // Generate QR Code Data String
     const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000);
     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000);
     const qrCodeDataString = `F2/${deviceId}/${UserID}/0/${endTimeStamp}/${startTimeStamp}`;
 
-    // Create new booking
     const newBooking = await Booking.create({
       user: user._id,
       podId,
@@ -1085,7 +1179,6 @@ const createBooking = asyncHandler(async (req, res) => {
     user.booking.push(newBooking._id);
     await user.save();
 
-    // Create or update product availability entry
     const productAvailability = await ProductAvailability.findOne({
       product_id: podId,
       booking_date: {
@@ -1103,7 +1196,6 @@ const createBooking = asyncHandler(async (req, res) => {
     });
 
     if (productAvailability) {
-      // Update slot bookings
       let updatedSlotBookings = productAvailability.slot_bookings;
       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
@@ -1117,7 +1209,6 @@ const createBooking = asyncHandler(async (req, res) => {
         { new: true }
       );
     } else {
-      // Create new product availability entry
       const indexes = (END_TIME - START_TIME) * 4;
       const slotBookings = Array.from({ length: indexes }, () => false);
       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
@@ -1135,7 +1226,6 @@ const createBooking = asyncHandler(async (req, res) => {
       await ProductAvailability.create(data);
     }
 
-    // Convert the new booking times to IST for the response
     const responseBooking = {
       ...newBooking._doc,
       bookingDate: moment(newBooking.bookingDate).tz("Asia/Kolkata").format(),
@@ -1144,15 +1234,17 @@ const createBooking = asyncHandler(async (req, res) => {
     };
 
     sendNotificationOnBooking(user, newBooking);
+    console.log("Booking created successfully:", newBooking._id);
     res.status(201).json({
       message: "Booking created successfully",
       booking: responseBooking,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error creating booking:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
 
 const sendNotificationOnBooking = asyncHandler(
   async (user = null, booking, userId = null) => {
@@ -1924,4 +2016,5 @@ module.exports = {
   blockStaff,
   unblockStaff,
   deleteStaff,
+  editStaff,
 };

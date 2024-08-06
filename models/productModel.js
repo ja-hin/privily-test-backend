@@ -34,6 +34,10 @@ var productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
     location: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Location",

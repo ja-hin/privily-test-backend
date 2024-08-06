@@ -44,10 +44,12 @@ const getAllLocationsDetails = asyncHandler(async (req, res) => {
   const getAllFeaturesDetails = asyncHandler(async (req, res) => {
     try {
       const features = await Features.find();
-      res.json({ "data": features });
+      res.json(features);
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Server Error" });
+     res.status(500).json({
+       status: "fail",
+       message: "An error occurred while fetching users.",
+     });
     }
   });
 
@@ -71,12 +73,6 @@ const createLocations = asyncHandler(async (req, res) => {
   const createFeature = asyncHandler(async (req, res) => {
     try {
       const { name, status } = req.body;
-
-      // Create a slug for the feature (optional)
-      // const slug_text = name;
-      // const slug = slugify(slug_text, { lower: true });
-
-      // Create the new feature
       const newFeature = await Features.create({ name, status });
 
       res.json(newFeature);
@@ -140,13 +136,14 @@ const unblockLocation = asyncHandler(async (req, res) => {
       { new: true }
     );
     if (!unblock) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Locatiom not found" });
     }
-    res.json({ message: "User unblocked successfully" });
+    res.json({ message: "location unblocked successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
+
 const unblockFeature = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
@@ -164,6 +161,94 @@ const unblockFeature = asyncHandler(async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+const deleteFeature = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateMongoDbId(id);
+  try {
+    const deleteaFeature = await Features.findByIdAndDelete(id);
+    res.json({
+      deleteaFeature,
+    });
+  } catch (error) {
+    throw new Error(error);
+  }
+});
+const deleteLocation = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  validateMongoDbId(id);
+  try {
+    const deleteaLocation = await Features.findByIdAndDelete(id);
+    res.json({
+      deleteaLocation,
+    });
+  } catch (error) {
+    throw new Error(error);
+  }
+});
+const editFeature = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { name, status, isBlocked } = req.body;
+
+  validateMongoDbId(id);
+
+  try {
+    const updatedFeature = await Features.findByIdAndUpdate(
+      id,
+      { name, status, isBlocked },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedFeature) {
+      return res.status(404).json({ message: "Feature not found" });
+    }
+
+    res.json({ message: "Feature updated successfully", updatedFeature });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+const editLocation = asyncHandler(async (req, res) => {
+  console.log("req.user:", req.user); // Add this line to debug
+  const { id } = req.params;
+  const {
+    name,
+    city,
+    state,
+    country_code,
+    zip,
+    latitude,
+    longitude,
+    isBlocked,
+  } = req.body;
+
+  validateMongoDbId(id);
+
+  try {
+    const updatedLocation = await Location.findByIdAndUpdate(
+      id,
+      {
+        name,
+        city,
+        state,
+        country_code,
+        zip,
+        latitude,
+        longitude,
+        isBlocked,
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedLocation) {
+      return res.status(404).json({ message: "Location not found" });
+    }
+
+    res.json({ message: "Location updated successfully", updatedLocation });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 module.exports = {
   getAllLocations,
@@ -175,5 +260,9 @@ module.exports = {
   getAllFeaturesDetails,
   blockFeature,
   unblockFeature,
+  deleteFeature,
+  editFeature,
+  deleteLocation,
+  editLocation,
 };
   

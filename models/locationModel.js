@@ -10,13 +10,6 @@ var locationSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  slug: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    index: true,
-  },
   city: {
     type: String,
     required: true,
