@@ -1,4 +1,4 @@
-const RateModel = require("../models/RateModel");
+const RateModel = require("../models/rateModel");
 const Transaction = require("../models/Transaction");
 const asyncHandler = require("express-async-handler");
 
