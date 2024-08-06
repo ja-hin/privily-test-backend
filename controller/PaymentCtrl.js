@@ -46,7 +46,7 @@ const axios = require("axios");
 const createPayment = async (req, res) => {
   try {
     const response = await axios.post(
-      "https://payments.yoco.com/api/checkouts",
+      `${YOCO_URL}`,
       {
         amount: req.body.amount,
         currency: "ZAR",
@@ -61,7 +61,7 @@ const createPayment = async (req, res) => {
       },
       {
         headers: {
-          Authorization: "Bearer sk_test_cf22177cvKQB93Qec734ed889edf",
+          Authorization: `Bearer ${process.env.YOCO_SECRET_KEY_LIVE}`,
         },
       }
     );
