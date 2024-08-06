@@ -42,6 +42,7 @@ const {
   blockStaff,
   unblockStaff,
   deleteStaff,
+  editStaff,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -69,7 +70,7 @@ router.get("/all-users", authMiddleware, isAdmin, getallUser);
 router.get("/all-staff", authMiddleware, isAdmin, getallstaff);
 router.put("/block-staff/:id", authMiddleware, isAdmin, blockStaff);
 router.put("/unblock-staff/:id", authMiddleware, isAdmin, unblockStaff);
-
+router.put("/edit-staff/:id", authMiddleware, isAdmin, editStaff);
 
 router.delete("/:id", authMiddleware, isAdmin, deleteaUser);
 router.delete("/delete-staff/:id", authMiddleware, isAdmin, deleteStaff);

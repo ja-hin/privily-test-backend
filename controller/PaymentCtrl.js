@@ -1,42 +1,94 @@
-// controllers/paymentController.js
-const axios = require("axios");
-const Payment = require("../models/Payment");
+// const axios = require("axios");
 
-const yocoSecretKey = "sk_test_cf22177cvKQB93Qec734ed889edf"; // Replace with your Yoco secret key
+// const createPayment = async (req, res) => {
+//   try {
+//     const response = await axios.post(
+//       "https://payments.yoco.com/api/checkouts",
+//       {
+//         amount: req.body.amount,
+//         currency: "ZAR",
+//         cancelUrl: req.body.cancelUrl,
+//         successUrl: req.body.successUrl,
+//         failureUrl: req.body.failureUrl,
+//         metadata: req.body.metadata,
+//         totalDiscount: req.body.totalDiscount,
+//         totalTaxAmount: req.body.totalTaxAmount,
+//         subtotalAmount: req.body.subtotalAmount,
+//         lineItems: null,
+//       },
+//       {
+//         headers: {
+//           Authorization: "Bearer sk_test_cf22177cvKQB93Qec734ed889edf",
+//         },
+//       }
+//     );
+
+//     res.status(200).json(response.data);
+//   } catch (error) {
+//     console.error(
+//       "Error details:",
+//       error.response ? error.response.data : error.message
+//     );
+//     res.status(500).json({
+//       message: "Failed to create checkout",
+//       error: error.response ? error.response.data : error.message,
+//     });
+//   }
+// };
+
+// module.exports = { createPayment };
+
+// //  Authorization: 'Bearer sk_test_cf22177cvKQB93Qec734ed889edf',
+ 
+
+const axios = require("axios");
 
 const createPayment = async (req, res) => {
-  const { token, amountInCents, currency } = req.body;
-
   try {
     const response = await axios.post(
-      "https://online.yoco.com/v1/charges/",
+      "https://payments.yoco.com/api/checkouts",
       {
-        token,
-        amountInCents,
-        currency,
+        amount: req.body.amount,
+        currency: "ZAR",
+        cancelUrl: req.body.cancelUrl,
+        successUrl: req.body.successUrl,
+        failureUrl: req.body.failureUrl,
+        metadata: req.body.metadata,
+        totalDiscount: req.body.totalDiscount,
+        totalTaxAmount: req.body.totalTaxAmount,
+        subtotalAmount: req.body.subtotalAmount,
+        lineItems: null,
       },
       {
         headers: {
-          "X-Auth-Secret-Key": yocoSecretKey,
+          Authorization: "Bearer sk_test_cf22177cvKQB93Qec734ed889edf",
         },
       }
     );
 
-    const payment = new Payment({
-      token,
-      amountInCents,
-      currency,
+    // Call the transaction API to save the transaction details
+    const transactionData = {
+      amount: response.data.amount,
+      currency: response.data.currency,
+      id: response.data.id,
+      merchantId: response.data.merchantId,
+      metadata: response.data.metadata,
       status: response.data.status,
-    });
+    };
 
-    await payment.save();
+    await axios.post("http://localhost:4000/api/transactions", transactionData);
 
-    res.send(response.data);
+    res.status(200).json(response.data);
   } catch (error) {
-    res.status(500).send({ error: error.response.data.message });
+    console.error(
+      "Error details:",
+      error.response ? error.response.data : error.message
+    );
+    res.status(500).json({
+      message: "Failed to create checkout",
+      error: error.response ? error.response.data : error.message,
+    });
   }
 };
 
-module.exports = {
-  createPayment,
-};
+module.exports = { createPayment };

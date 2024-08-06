@@ -18,6 +18,27 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    // amount: { type: String, required: true },
+    // currency: {
+    //   type: String,
+    //   required: true,
+    // },
+    // Payment_id: {
+    //   type: String,
+    //   required: true,
+    // },
+    // merchantId: {
+    //   type: String,
+    //   required: true,
+    // },
+    // status: {
+    //   type: String,
+    //   required: true,
+    // },
+    bookingPurpose: {
+      type: String,
+      required: true,
+    },
     description: {
       type: String,
     },
@@ -37,7 +58,7 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    qrCodeData:{
+    qrCodeData: {
       type: String,
       required: true,
     },
@@ -57,11 +78,10 @@ const bookingSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    feedback: 
-    {
+    feedback: {
       rating: { type: Number },
-      message: { type: String }
-  }
+      message: { type: String },
+    },
 
     // totalCost: {
     //   type: Number,
