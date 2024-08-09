@@ -22,6 +22,10 @@ var productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    direction:{
+      type: String,
+      required: true,
+    },
     booking_requirements: {
       type: String,
       required: true,
