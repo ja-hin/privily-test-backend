@@ -1774,14 +1774,106 @@ const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
 //     res.status(500).json({ message: "Failed to update booking status" });
 //   }
 // });
+// const updateBookingStatusAutomatically = async (req, res, next) => {
+//   const { _id } = req.user;
+//   validateMongoDbId(_id);
+
+//   try {
+//     const now = new Date();
+
+//     console.log("Current Time:", now);
+
+//     // Find all active bookings
+//     const bookings = await Booking.find({
+//       user: _id,
+//       isBookingActive: true,
+//       status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] },
+//     }).populate("user");
+
+//     // Update booking statuses
+//     const updatedBookings = await Promise.all(
+//       bookings.map(async (booking) => {
+//         if (booking.startTime <= now && now < booking.endTime) {
+//           // Check if now is within booking's start and end time
+//           booking.status = "Processing";
+//         } else if (now >= booking.endTime) {
+//           // Check if now is past the booking's end time
+//           booking.status = "Completed";
+//           booking.isBookingActive = false; // Mark booking as inactive
+//         }
+//         return await booking.save();
+//       })
+//     );
+
+//     if (next) {
+//       next();
+//     } else {
+//       // Send the response
+//       res.json({
+//         message: "Booking status updated successfully",
+//         updatedBookings,
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error updating booking status:", error);
+//     if (next) {
+//       next(error);
+//     } else {
+//       res.status(500).json({ message: "Failed to update booking status" });
+//     }
+//   }
+// };
+
+// const updateBookingStatusAutomatically = async (req, res, next) => {
+//   const { _id } = req.user;
+//   validateMongoDbId(_id);
+
+//   try {
+//     const now = new Date();
+
+//     // Find all active bookings
+//     const bookings = await Booking.find({
+//       user: _id,
+//       isBookingActive: true,
+//       status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] },
+//     }).populate("user");
+
+//     // Update booking statuses
+//     const updatedBookings = await Promise.all(
+//       bookings.map(async (booking) => {
+//         if (booking.startTime <= now && now < booking.endTime) {
+//           booking.status = "Processing";
+//         } else if (now >= booking.endTime) {
+//           booking.status = "Completed";
+//           booking.isBookingActive = false;
+//         }
+//         return await booking.save();
+//       })
+//     );
+
+//     if (next) {
+//       next();
+//     } else {
+//       res.json({
+//         message: "Booking status updated successfully",
+//         updatedBookings,
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error updating booking status:", error);
+//     if (next) {
+//       next(error);
+//     } else {
+//       res.status(500).json({ message: "Failed to update booking status" });
+//     }
+//   }
+// };
 const updateBookingStatusAutomatically = async (req, res, next) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
 
   try {
     const now = new Date();
-
-    console.log("Current Time:", now);
 
     // Find all active bookings
     const bookings = await Booking.find({
@@ -1794,12 +1886,10 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
     const updatedBookings = await Promise.all(
       bookings.map(async (booking) => {
         if (booking.startTime <= now && now < booking.endTime) {
-          // Check if now is within booking's start and end time
           booking.status = "Processing";
         } else if (now >= booking.endTime) {
-          // Check if now is past the booking's end time
           booking.status = "Completed";
-          booking.isBookingActive = false; // Mark booking as inactive
+          booking.isBookingActive = false;
         }
         return await booking.save();
       })
@@ -1808,7 +1898,6 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
     if (next) {
       next();
     } else {
-      // Send the response
       res.json({
         message: "Booking status updated successfully",
         updatedBookings,
@@ -1824,69 +1913,100 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
   }
 };
 
+
 // rating a booking after completion of booking by user if status is Completed
-const rateBooking = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  validateMongoDbId(id);
+// const rateBooking = asyncHandler(async (req, res) => {
+//   const { id } = req.params;
+//   validateMongoDbId(id);
+//   try {
+//     const booking = await Booking.findById(id)
+//       .populate("user")
+//       .populate("podId")
+//       .exec();
+//       console.log("booking", booking);
+//     if (!booking) {
+//       return res.status(404).json({ message: "Booking not found" });
+//     }
+//     if (booking.status !== "Completed") {
+//       return res
+//         .status(400)
+//         .json({ message: "Booking must be completed to rate it." });
+//     } else if (booking.isBookingActive === false) {
+//       return res.status(400).json({ message: "Booking is already rated." });
+//     }
+
+//     const product = booking.podId;
+
+//     if (!product) {
+//       return res.status(404).json({ message: "Product not found" });
+//     }
+
+//     const { rating, message } = req.body;
+//     booking.feedback = {
+//       rating,
+//       message,
+//     };
+
+//     if (!product.ratings) {
+//       product.ratings = [];
+//     }
+
+//     const newRating = {
+//       star: rating,
+//       comment: message,
+//       postedby: booking.user._id,
+//     };
+//     product.ratings.push(newRating);
+
+//     let totalRating = 0;
+//     product.ratings.forEach((rating) => {
+//       totalRating += rating.star;
+//     });
+//     product.ratingCount = product.ratings.length;
+//     product.totalRating = totalRating / product.ratingCount;
+
+//     // Notify the user about the rating
+//     sendNotification(req, res);
+
+//     booking.status = "Rated";
+//     booking.isBookingActive = false;
+//     await booking.save();
+//     await product.save();
+
+//     res.json({ message: "Successfully Rated" });
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// });
+
+const rateBooking = async (req, res) => {
   try {
-    const booking = await Booking.findById(id)
-      .populate("user")
-      .populate("podId")
-      .exec();
+    const { rating, message } = req.body;
+    const bookingId = req.params.id;
+
+    console.log("Received rating request for booking ID:", bookingId);
+    console.log("Rating:", rating, "Message:", message);
+
+    const booking = await Booking.findById(bookingId);
+
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
+
     if (booking.status !== "Completed") {
-      return res
-        .status(400)
-        .json({ message: "Booking must be completed to rate it." });
-    } else if (booking.isBookingActive === false) {
-      return res.status(400).json({ message: "Booking is already rated." });
+      return res.status(400).json({ message: "Booking is not completed yet" });
     }
 
-    const product = booking.podId;
-
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-
-    const { rating, message } = req.body;
-    booking.feedback = {
-      rating,
-      message,
-    };
-
-    if (!product.ratings) {
-      product.ratings = [];
-    }
-
-    const newRating = {
-      star: rating,
-      comment: message,
-      postedby: booking.user._id,
-    };
-    product.ratings.push(newRating);
-
-    let totalRating = 0;
-    product.ratings.forEach((rating) => {
-      totalRating += rating.star;
-    });
-    product.ratingCount = product.ratings.length;
-    product.totalRating = totalRating / product.ratingCount;
-
-    // Notify the user about the rating
-    sendNotification(req, res);
-
+    booking.feedback = { rating, message };
     booking.status = "Rated";
-    booking.isBookingActive = false;
-    await booking.save();
-    await product.save();
 
-    res.json({ message: "Successfully Rated" });
+    await booking.save();
+
+    res.status(200).json({ message: "Rating submitted successfully", booking });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
-});
+};
 
 // Update booking status as per the status provided by admin to manage booking status
 const updateBookingStatusByAdmin = asyncHandler(async (req, res) => {

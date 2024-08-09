@@ -89,7 +89,7 @@ router.get("/all-bookings", authMiddleware, isAdmin, getBookings);
 router.get("/booking/:id", authMiddleware, getBookingById);
 router.put("/update-booking/:id", authMiddleware, updateBookingById);
 router.put("/cancel-booking/:id", authMiddleware, cancelBooking);
-router.put("/feedback/:id", authMiddleware, bookingFeedback);
+router.put("/feedback/:id",  bookingFeedback);
 router.get("/:id", authMiddleware, isAdmin, getaUser);
 router.post("/corporate-pods", corporatePods);
 router.post('/extend/:bookingId', authMiddleware, extendBooking);
@@ -108,7 +108,7 @@ router.put(
   updateBookingStatusByAdmin
 );
 
-router.post("/rate-booking/:id", authMiddleware, rateBooking);
+router.put("/rate-booking/:id",  rateBooking);
 
 router.get("/notifications/active", authMiddleware, getAllNotification);
 router.put("/notification/send", authMiddleware, sendNotification);
