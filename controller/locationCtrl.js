@@ -177,7 +177,7 @@ const deleteLocation = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
   try {
-    const deleteaLocation = await Features.findByIdAndDelete(id);
+    const deleteaLocation = await Location.findByIdAndDelete(id);
     res.json({
       deleteaLocation,
     });
