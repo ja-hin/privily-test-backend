@@ -26,6 +26,29 @@ const moment = require('moment-timezone');
 //     });
 //   }
 // });
+// const createProduct = asyncHandler(async (req, res) => {
+//   try {
+//     const location_obj = await Location.findOne({ _id: req.body.location });
+//     req.body.location = location_obj.id;
+
+//     if (req.body.title) {
+//       req.body.slug = slugify(req.body.title + "" + location_obj.slug);
+//     }
+
+//     // Add device ID to the product schema
+//     req.body.deviceId = req.body.deviceId;
+//     req.body.userId = req.body.userId;
+
+//     const newProduct = await Product.create(req.body);
+//     res.json(newProduct);
+//   } catch (error) {
+//     console.error(error); // Log the error for debugging purposes
+//     res.status(500).json({
+//       status: "fail",
+//       message: "An error occurred while creating the product.",
+//     });
+//   }
+// });
 const createProduct = asyncHandler(async (req, res) => {
   try {
     const location_obj = await Location.findOne({ _id: req.body.location });
@@ -35,9 +58,10 @@ const createProduct = asyncHandler(async (req, res) => {
       req.body.slug = slugify(req.body.title + "" + location_obj.slug);
     }
 
-    // Add device ID to the product schema
+    // Add device ID and direction to the product schema
     req.body.deviceId = req.body.deviceId;
     req.body.userId = req.body.userId;
+    req.body.direction = req.body.direction; // New field for direction
 
     const newProduct = await Product.create(req.body);
     res.json(newProduct);
@@ -52,6 +76,32 @@ const createProduct = asyncHandler(async (req, res) => {
 
 
 // update a pod details
+// const updateProduct = asyncHandler(async (req, res) => {
+//   const id = req.params.id; // Accessing the id from params correctly
+//   validateMongoDbId(id);
+//   try {
+//     if (req.body.title) {
+//       req.body.slug = slugify(req.body.title);
+//     }
+//     const updatedProduct = await Product.findOneAndUpdate(
+//       { _id: id },
+//       req.body,
+//       {
+//         new: true,
+//         runValidators: true, // Ensure validators are run on update
+//       }
+//     );
+//     if (!updatedProduct) {
+//       return res
+//         .status(404)
+//         .json({ status: "fail", message: "Product not found" });
+//     }
+//     res.json(updatedProduct);
+//   } catch (error) {
+//     console.error(error); // Log the error for debugging purposes
+//     res.status(500).json({ status: "error", message: "Internal server error" });
+//   }
+// });
 const updateProduct = asyncHandler(async (req, res) => {
   const id = req.params.id; // Accessing the id from params correctly
   validateMongoDbId(id);
@@ -59,6 +109,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     if (req.body.title) {
       req.body.slug = slugify(req.body.title);
     }
+
     const updatedProduct = await Product.findOneAndUpdate(
       { _id: id },
       req.body,
@@ -67,6 +118,7 @@ const updateProduct = asyncHandler(async (req, res) => {
         runValidators: true, // Ensure validators are run on update
       }
     );
+
     if (!updatedProduct) {
       return res
         .status(404)

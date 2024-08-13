@@ -1,5 +1,3 @@
-//models/bookingModel.js
-
 const mongoose = require("mongoose");
 
 const bookingSchema = new mongoose.Schema(
@@ -18,26 +16,9 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    // amount: { type: String, required: true },
-    // currency: {
-    //   type: String,
-    //   required: true,
-    // },
-    // Payment_id: {
-    //   type: String,
-    //   required: true,
-    // },
-    // merchantId: {
-    //   type: String,
-    //   required: true,
-    // },
-    // status: {
-    //   type: String,
-    //   required: true,
-    // },
-    bookingPurpose: {
+    shortDescription: {
       type: String,
-      required: true,
+      default: "", // Optional field
     },
     description: {
       type: String,
@@ -82,18 +63,10 @@ const bookingSchema = new mongoose.Schema(
       rating: { type: Number },
       message: { type: String },
     },
-
-    // totalCost: {
-    //   type: Number,
-    //   required: true,
-    // },
-    // totalAfterDiscountCost: {
-    //   type: Number,
-    // },
   },
   {
     timestamps: true,
   }
 );
-// bookingSchema.index({ date: 1 }, { unique: true }); // Ensure unique bookings per date (optional)
+
 module.exports = mongoose.model("Booking", bookingSchema);
