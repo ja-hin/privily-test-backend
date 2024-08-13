@@ -22,8 +22,8 @@ var productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    direction:{
-      type: String,
+    direction: {
+      type: String, // URL for the maps link
       required: true,
     },
     booking_requirements: {
