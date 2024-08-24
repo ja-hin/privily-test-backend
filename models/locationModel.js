@@ -38,6 +38,12 @@ var locationSchema = new mongoose.Schema({
     max: 180,
     min: -180,
   },
+  images: 
+    {
+      public_id: String,
+      url: String,
+    },
+  
 });
 
 //Export the model

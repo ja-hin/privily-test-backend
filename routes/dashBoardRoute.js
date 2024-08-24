@@ -27,7 +27,10 @@ const getData = {
     page: "pods",
     method: async () => {
       try {
-        const products = await productModel.find();
+        const products = await productModel
+          .find()
+          .populate("location")
+          .populate("features");
         return products;
       } catch {
         return "Error occurred";
