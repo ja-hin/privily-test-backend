@@ -10,6 +10,10 @@ var locationSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  Street: {
+    type: String,
+    required: true,
+  },
   city: {
     type: String,
     required: true,
@@ -38,12 +42,10 @@ var locationSchema = new mongoose.Schema({
     max: 180,
     min: -180,
   },
-  images: 
-    {
-      public_id: String,
-      url: String,
-    },
-  
+  images: {
+    public_id: String,
+    url: String,
+  },
 });
 
 //Export the model
