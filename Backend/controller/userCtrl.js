@@ -1093,7 +1093,7 @@ const createBooking = asyncHandler(async (req, res) => {
       endTime,
       timeSlotNumber,
       bookingPurpose,
-      description,
+      shortDescription,
     } = req.body;
 
     console.log("Booking creation started:", {
@@ -1167,7 +1167,7 @@ const createBooking = asyncHandler(async (req, res) => {
       endTime: endTimeObj,
       timeSlotNumber,
       bookingPurpose,
-      description: description || null,
+      shortDescription: shortDescription || null,
       status: "Pending",
       qrCodeData: qrCodeDataString,
       feedback: {
