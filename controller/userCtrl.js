@@ -1979,14 +1979,45 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
 //   }
 // });
 
+// const rateBooking = async (req, res) => {
+//   try {
+//     const { rating, message } = req.body;
+//     const bookingId = req.params.id;
+
+//     console.log("Received rating request for booking ID:", bookingId);
+//     console.log("Rating:", rating, "Message:", message);
+
+//     const booking = await Booking.findById(bookingId);
+
+//     if (!booking) {
+//       return res.status(404).json({ message: "Booking not found" });
+//     }
+
+//     if (booking.status !== "Completed") {
+//       return res.status(400).json({ message: "Booking is not completed yet" });
+//     }
+
+//     booking.feedback = { rating, message };
+//     booking.status = "Rated";
+
+//     await booking.save();
+
+//     res.status(200).json({ message: "Rating submitted successfully", booking });
+//   } catch (error) {
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
 const rateBooking = async (req, res) => {
   try {
     const { rating, message } = req.body;
-    const bookingId = req.params.id;
+    const bookingId = req.params.bookingId; // Assume the booking ID is passed in the URL
+    const productId = req.params.productId; // Assume the product ID is also passed in the URL
+    // const userId = req.user._id; // Assume user ID is available from authentication middleware
 
     console.log("Received rating request for booking ID:", bookingId);
     console.log("Rating:", rating, "Message:", message);
 
+    // Find the booking by booking ID
     const booking = await Booking.findById(bookingId);
 
     if (!booking) {
@@ -1997,16 +2028,39 @@ const rateBooking = async (req, res) => {
       return res.status(400).json({ message: "Booking is not completed yet" });
     }
 
+    // Save feedback in Booking
     booking.feedback = { rating, message };
     booking.status = "Rated";
-
     await booking.save();
 
-    res.status(200).json({ message: "Rating submitted successfully", booking });
+    // Find the corresponding product by product ID
+    const product = await productModel.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Add the rating to the product's ratings array
+    product.ratings.push({
+      star: rating,
+      comment: message,
+      // postedby: userId,
+    });
+
+    // Save the product with the updated ratings
+    await product.save();
+
+    // Send the response back with both booking and product
+    res.status(200).json({
+      message: "Rating submitted successfully for both booking and product",
+      booking,
+      product,
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 // Update booking status as per the status provided by admin to manage booking status
 const updateBookingStatusByAdmin = asyncHandler(async (req, res) => {
@@ -2088,6 +2142,7 @@ const getAllNotification = asyncHandler(async (req, res) => {
         "This is regarding your last booking on " +
         booking.bookingDate.toString(),
       booking_id: booking._id,
+      podId:booking.podId,
       icon: "icon to send",
       type: "Rating", // as per this type, frontend will redirect to feedback mark page.
     });

@@ -108,7 +108,7 @@ router.put(
   updateBookingStatusByAdmin
 );
 
-router.put("/rate-booking/:id",  rateBooking);
+router.put("/rate/:bookingId/:productId", rateBooking);
 
 router.get("/notifications/active", authMiddleware, getAllNotification);
 router.put("/notification/send", authMiddleware, sendNotification);
