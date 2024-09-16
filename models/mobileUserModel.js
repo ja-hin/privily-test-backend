@@ -6,7 +6,7 @@ const mobileUserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
     },
-    phoneNumber: { type: String, required: true, unique: true },
+    phoneNumber: { type: String, required: true},
     otp: String,
     otpExpires: Date,
 });

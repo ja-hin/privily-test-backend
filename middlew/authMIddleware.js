@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 const asyncHandler = require("express-async-handler");
+const registerstaff = require("../models/registerstaff");
 
 const authMiddleware = asyncHandler(async (req, res, next) => {
   let token;
@@ -8,7 +9,12 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     token = req.headers.authorization.split(" ")[1];
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "");
-      const user = await User.findById(decoded.id);
+      console.log(decoded);
+      let user = await User.findById(decoded.id);
+
+      if(!user){
+        user = await registerstaff.findById(decoded.id);
+      }
 
       if (!user) {
         return res.status(401).json({ message: "User not found" });
@@ -30,7 +36,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
 
 const isAdmin = asyncHandler(async (req, res, next) => {
   const { email } = req.user;
-  const adminUser = await User.findOne({ email });
+  const adminUser = await registerstaff.findOne({ email });
   if (!adminUser || adminUser.role !== "admin") {
     return res.status(403).json({ message: "You are not an Admin" });
   }

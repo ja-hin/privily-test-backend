@@ -34,10 +34,12 @@ var productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    safety_and_property:{
-      type:String,
-      required:true,
+    safety_and_property: {
+      type: String,
+      required: [true, "Safety and property is required"],
+      default: "N/A", // Or any appropriate default value
     },
+
     availability: {
       type: String,
       required: true,

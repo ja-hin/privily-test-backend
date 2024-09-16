@@ -36,9 +36,8 @@ const twilioClient = twilio(
 //   }
 // });
 const createUser = asyncHandler(async (req, res) => {
-  const { email, mobile, firstname, lastname } = req.body;
-
-  if (!email || !mobile || !firstname || !lastname) {
+  const { email, phoneNumber, firstname, lastname } = req.body;
+  if (!email || !phoneNumber || !firstname || !lastname) {
     return res.status(400).send("All fields are required");
   }
 
@@ -50,13 +49,12 @@ const createUser = asyncHandler(async (req, res) => {
   try {
     const newUser = new User({
       email,
-      mobile,
+      phoneNumber,
       firstname,
       lastname,
       // password field is not included
     });
     await newUser.save();
-    console.log("user registered");
     const token = generateToken(newUser._id);
     res.json({
       message: "User registered successfully",
@@ -135,7 +133,7 @@ const createUser = asyncHandler(async (req, res) => {
 //new..
 
 const registerAndAssignRoles = asyncHandler(async (req, res) => {
-  const { firstname, lastname, email, mobile, password, role, auth_page } =
+  const { firstname, lastname, email, phoneNumber, password, role, auth_page } =
     req.body;
 
   // Validate input
@@ -143,7 +141,7 @@ const registerAndAssignRoles = asyncHandler(async (req, res) => {
     !firstname ||
     !lastname ||
     !email ||
-    !mobile ||
+    !phoneNumber ||
     !password ||
     !role ||
     !auth_page
@@ -162,7 +160,7 @@ const registerAndAssignRoles = asyncHandler(async (req, res) => {
     firstname,
     lastname,
     email,
-    mobile,
+    phoneNumber,
     password,
     role,
     auth_page,
@@ -220,7 +218,7 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
       firstname: findStaff.firstname,
       lastname: findStaff.lastname,
       email: findStaff.email,
-      mobile: findStaff.mobile,
+      phoneNumber: findStaff.phoneNumber,
       role: findStaff.role,
       auth_page: findStaff.auth_page,
       token: generateToken(findStaff._id),
@@ -335,7 +333,7 @@ const loginMobileUserCtrl = asyncHandler(async (req, res) => {
     await mobileUser.save();
 
     await twilioClient.messages.create({
-      body: `Your OTP is ${otp}`,
+      body: `Your Privily App One Time password is ${otp}`,
       from: process.env.TWILIO_PHONE_NUMBER,
       to: phoneNumber,
     });
@@ -364,7 +362,7 @@ const loginAdmin = asyncHandler(async (req, res) => {
       firstname: findAdmin?.firstname,
       lastname: findAdmin?.lastname,
       email: findAdmin?.email,
-      mobile: findAdmin?.mobile,
+      phoneNumber: findAdmin?.phoneNumber,
       token: generateToken(findAdmin?._id),
     });
   } else {
@@ -419,7 +417,7 @@ const verifyMobileOtp = asyncHandler(async (req, res) => {
     mobileUser.otpExpires = null;
     await mobileUser.save();
 
-    const existingUser = await User.findOne({ mobile: phoneNumber });
+    const existingUser = await User.findOne({ phoneNumber: phoneNumber });
     console.log("existingUser");
     console.log(existingUser);
     if (existingUser) {
@@ -518,7 +516,7 @@ const updatedUser = asyncHandler(async (req, res) => {
         firstname: req?.body?.firstname,
         lastname: req?.body?.lastname,
         email: req?.body?.email,
-        mobile: req?.body?.mobile,
+        phoneNumber: req?.body?.phoneNumber,
       },
       {
         new: true,
@@ -694,7 +692,7 @@ const unblockStaff = asyncHandler(async (req, res) => {
 
 const editStaff = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { firstname, lastname, email, mobile, password, role, auth_page } =
+  const { firstname, lastname, email, phoneNumber, password, role, auth_page } =
     req.body;
 
   validateMongoDbId(id);
@@ -709,7 +707,7 @@ const editStaff = asyncHandler(async (req, res) => {
     staffMember.firstname = firstname || staffMember.firstname;
     staffMember.lastname = lastname || staffMember.lastname;
     staffMember.email = email || staffMember.email;
-    staffMember.mobile = mobile || staffMember.mobile;
+    staffMember.phoneNumber = phoneNumber || staffMember.phoneNumber;
     staffMember.role = role || staffMember.role;
     staffMember.auth_page = auth_page || staffMember.auth_page;
 
@@ -885,12 +883,12 @@ const getMe = async (req, res) => {
 
 //Get data for corporate pods
 const corporatePods = asyncHandler(async (req, res) => {
-  const { companyName, email, mobile } = req.body;
+  const { companyName, email, phoneNumber } = req.body;
 
   const corporate = new Corporate({
     companyName,
     email,
-    mobile,
+    phoneNumber,
   });
 
   // Save the data to the database
@@ -902,7 +900,7 @@ const corporatePods = asyncHandler(async (req, res) => {
       _id: savedData._id,
       companyName: savedData.companyName,
       email: savedData.email,
-      mobile: savedData.mobile,
+      phoneNumber: savedData.phoneNumber,
     },
   });
 });
@@ -1201,7 +1199,16 @@ const createBooking = asyncHandler(async (req, res) => {
       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
       for (let i = startingIndex; i < endingIndex; i++) {
         updatedSlotBookings[i] = true;
+        console.log(`Slot ${i} marked as true`);
       }
+      console.log(
+        "Starting index:",
+        startingIndex,
+        "Ending index:",
+        endingIndex
+      );
+      console.log("Before update:", updatedSlotBookings);
+
 
       await ProductAvailability.findOneAndUpdate(
         { _id: productAvailability._id },
@@ -1213,11 +1220,9 @@ const createBooking = asyncHandler(async (req, res) => {
       const slotBookings = Array.from({ length: indexes }, () => false);
       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
-
       for (let i = startingIndex; i < endingIndex; i++) {
         slotBookings[i] = true;
       }
-
       const data = {
         product_id: podId,
         slot_bookings: slotBookings,

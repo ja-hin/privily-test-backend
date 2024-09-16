@@ -7,6 +7,7 @@ const slugify = require("slugify");
 const validateMongoDbId = require("../utils/validateMongodbId");
 const { START_TIME, END_TIME } = require('./constants');
 const moment = require('moment-timezone');
+const featureModel = require("../models/featureModel");
 
 // create a pod with details
 // const createProduct = asyncHandler(async (req, res) => {
@@ -53,6 +54,11 @@ const createProduct = asyncHandler(async (req, res) => {
   try {
     const location_obj = await Location.findOne({ _id: req.body.location });
     req.body.location = location_obj.id;
+
+    const feature_obj= await featureModel.findOne({_id:req.body.features})
+    req.body.features=feature_obj.id;
+
+    console.log("feature_obj", feature_obj);
 
     if (req.body.title) {
       req.body.slug = slugify(req.body.title + "" + location_obj.slug);
@@ -155,7 +161,9 @@ const getaProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
   try {
-    const findProduct = await Product.findById(id).populate({ path: 'location' });;
+    const findProduct = await Product.findById(id)
+      .populate({ path: "location" })
+      .populate({ path: "features" }); 
     res.json(findProduct);
   } catch (error) {
     throw new Error(error);
