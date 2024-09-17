@@ -77,7 +77,7 @@ const createPayment = async (req, res) => {
     };
 
     await axios.post(
-      "https://hammerhead-app-lqsdj.ondigitalocean.app/api/transactions",
+      "https://privily-backend-new-1.onrender.com/api/transactions",
       transactionData
     );
 

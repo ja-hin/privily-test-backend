@@ -224,7 +224,9 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
       token: generateToken(findStaff._id),
     });
   } else {
-    res.status(401).send("Invalid Credentials");
+    res
+      .status(401)
+      .json({ message: "Invalid email or password. Please try again.",status:400 });
   }
 });
 
