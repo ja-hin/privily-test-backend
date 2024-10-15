@@ -459,7 +459,7 @@ const getAllProductAddress = asyncHandler(async (req, res) => {
 //       return res.status(400).json({ message: "Please provide a Booking Date" });
 //     }
 
-//     const targetDate = moment.tz(req.query.booking_date, "Asia/Kolkata");
+//     const targetDate = moment.tz(req.query.booking_date, "Africa/Johannesburg");
     
 //     // Fetch a product availability
 //     const id = req.params.id;
@@ -495,7 +495,8 @@ const productAvailability = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: "Please provide a Booking Date" });
     }
 
-    const targetDate = moment.tz(req.query.booking_date, "Asia/Kolkata");
+    const targetDate = moment(req.query.booking_date);
+    console.log(targetDate);
 
     // Fetch a product availability
     const id = req.params.id;
@@ -518,12 +519,12 @@ const productAvailability = asyncHandler(async (req, res) => {
       });
     }
 
-    const currentTime = moment().tz("Asia/Kolkata");
+    const currentTime = moment();
     const currentSlotIndex = Math.floor(
       (currentTime.hours() * 60 + currentTime.minutes() - START_TIME * 60) / 15
     );
     const nextSlotStartTime = moment()
-      .tz("Asia/Kolkata")
+      
       .startOf("day")
       .add((currentSlotIndex + 1) * 15 + START_TIME * 60, "minutes");
 

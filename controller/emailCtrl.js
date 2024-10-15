@@ -19,7 +19,7 @@ const sendEmail = async (to, subject, html) => {
       },
     });
     const mailOptions = {
-      from: '"Hey 👻" <imanshu822@gmail.com>',
+      from: '"Hey 👻" <jatinhinduja4@gmail.com>',
       to: to,
       subject: subject,
       html: html,

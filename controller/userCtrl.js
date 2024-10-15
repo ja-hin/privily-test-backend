@@ -944,8 +944,11 @@ const corporatePods = asyncHandler(async (req, res) => {
 
 // Function to get slot index from time
 function get_slot_index_from_time(time_obj, start_time) {
-  const hours = time_obj.getHours();
-  const minutes = time_obj.getMinutes();
+  console.log("Time object: ", time_obj);
+  const hours = time_obj.getUTCHours();
+  const minutes = time_obj.getUTCMinutes();
+  console.log("time: ", hours, minutes);
+  console.log("Index: ", (hours - start_time) * 4 + Math.floor(minutes / 15));
   return (hours - start_time) * 4 + Math.floor(minutes / 15);
 }
 
@@ -964,9 +967,6 @@ function get_slot_index_from_time(time_obj, start_time) {
 //     }
 
 //     // Convert bookingDate, startTime, and endTime to Date objects in IST
-//     const bookingDateObj = moment.tz(bookingDate, "Asia/Kolkata").toDate();
-//     const startTimeObj = moment.tz(startTime, "Asia/Kolkata").toDate();
-//     const endTimeObj = moment.tz(endTime, "Asia/Kolkata").toDate();
 
 //     // Check for overlapping bookings
 //     const existingBooking = await Booking.findOne({
@@ -1069,9 +1069,6 @@ function get_slot_index_from_time(time_obj, start_time) {
 //     // Convert the new booking times to IST for the response
 //     const responseBooking = {
 //       ...newBooking._doc,
-//       bookingDate: moment(newBooking.bookingDate).tz("Asia/Kolkata").format(),
-//       startTime: moment(newBooking.startTime).tz("Asia/Kolkata").format(),
-//       endTime: moment(newBooking.endTime).tz("Asia/Kolkata").format(),
 //     };
 
 //     sendNotificationOnBooking(user, newBooking);
@@ -1119,9 +1116,15 @@ const createBooking = asyncHandler(async (req, res) => {
     const deviceId = pod.deviceId;
     const UserID = pod.UserId;
 
-    const bookingDateObj = moment.tz(bookingDate, "Asia/Kolkata").toDate();
-    const startTimeObj = moment.tz(startTime, "Asia/Kolkata").toDate();
-    const endTimeObj = moment.tz(endTime, "Asia/Kolkata").toDate();
+    // const bookingDateObj = moment.tz(bookingDate, "Africa/Johannesburg").toDate();
+    // const startTimeObj = moment.tz(startTime, "Africa/Johannesburg").toDate();
+    // const endTimeObj = moment.tz(endTime, "Africa/Johannesburg").toDate();
+    const bookingDateObj = moment(bookingDate).toDate();
+    const startTimeObj = moment(startTime).toDate();
+    const endTimeObj = moment(endTime).toDate();
+    console.log("startTimeObj:", startTimeObj);
+    console.log("endTimeObj:", endTimeObj);
+    console.log("START_TIME:", START_TIME);
 
     const existingBooking = await Booking.findOne({
       podId,
@@ -1195,10 +1198,14 @@ const createBooking = asyncHandler(async (req, res) => {
       },
     });
 
+    console.log("Product availablity backend",productAvailability)
+
     if (productAvailability) {
+      // console.log("times: ", startTimeObj, endTimeObj);
       let updatedSlotBookings = productAvailability.slot_bookings;
       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
+      console.log("Indices: ",startingIndex, endingIndex)
       for (let i = startingIndex; i < endingIndex; i++) {
         updatedSlotBookings[i] = true;
         console.log(`Slot ${i} marked as true`);
@@ -1211,12 +1218,12 @@ const createBooking = asyncHandler(async (req, res) => {
       );
       console.log("Before update:", updatedSlotBookings);
 
-
-      await ProductAvailability.findOneAndUpdate(
+      const newAvailablity = await ProductAvailability.findOneAndUpdate(
         { _id: productAvailability._id },
         { slot_bookings: updatedSlotBookings },
         { new: true }
       );
+      console.log("hg",newAvailablity);
     } else {
       const indexes = (END_TIME - START_TIME) * 4;
       const slotBookings = Array.from({ length: indexes }, () => false);
@@ -1233,18 +1240,22 @@ const createBooking = asyncHandler(async (req, res) => {
       await ProductAvailability.create(data);
     }
 
-    const responseBooking = {
-      ...newBooking._doc,
-      bookingDate: moment(newBooking.bookingDate).tz("Asia/Kolkata").format(),
-      startTime: moment(newBooking.startTime).tz("Asia/Kolkata").format(),
-      endTime: moment(newBooking.endTime).tz("Asia/Kolkata").format(),
-    };
+    // const responseBooking = {
+    //   ...newBooking._doc,
+    //   bookingDate: moment(newBooking.bookingDate)
+    //     // .tz("Africa/Johannesburg")
+    //     .format(),
+    //   startTime: moment(newBooking.startTime)
+    //     // .tz("Africa/Johannesburg")
+    //     .format(),
+    //   endTime: moment(newBooking.endTime).format(),
+    // };
 
     sendNotificationOnBooking(user, newBooking);
     console.log("Booking created successfully:", newBooking._id);
     res.status(201).json({
       message: "Booking created successfully",
-      booking: responseBooking,
+      booking: newBooking,
     });
   } catch (error) {
     console.error("Error creating booking:", error);
@@ -1270,10 +1281,10 @@ const sendNotificationOnBooking = asyncHandler(
       // Format booking date and times
       const formattedBookingDate = booking.bookingDate.toDateString();
       const formattedStartTime = moment(booking.startTime)
-        .tz("Asia/Kolkata")
+        // .tz("Africa/Johannesburg")
         .format("hh:mm A");
       const formattedEndTime = moment(booking.endTime)
-        .tz("Asia/Kolkata")
+        // .tz("Africa/Johannesburg")
         .format("hh:mm A");
 
       // Construct email content
@@ -1384,9 +1395,9 @@ const extendBooking = asyncHandler(async (req, res) => {
     // Convert the updated booking times to IST for the response
     const responseBooking = {
       ...booking._doc,
-      bookingDate: moment(booking.bookingDate).tz("Asia/Kolkata").format(),
-      startTime: moment(booking.startTime).tz("Asia/Kolkata").format(),
-      endTime: moment(booking.endTime).tz("Asia/Kolkata").format(),
+      bookingDate: moment(booking.bookingDate).format(),
+      startTime: moment(booking.startTime).format(),
+      endTime: moment(booking.endTime).format(),
     };
 
     return res.status(200).json({
@@ -1881,7 +1892,7 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
 
   try {
     const now = new Date();
-
+const updatedTime = new Date(now.setHours(now.getHours() + 2));
     // Find all active bookings
     const bookings = await Booking.find({
       user: _id,
@@ -1892,9 +1903,9 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
     // Update booking statuses
     const updatedBookings = await Promise.all(
       bookings.map(async (booking) => {
-        if (booking.startTime <= now && now < booking.endTime) {
+        if (booking.startTime <= updatedTime && updatedTime < booking.endTime) {
           booking.status = "Processing";
-        } else if (now >= booking.endTime) {
+        } else if (updatedTime >= booking.endTime) {
           booking.status = "Completed";
           booking.isBookingActive = false;
         }

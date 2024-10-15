@@ -41,18 +41,50 @@ const getAllLocationsDetails = asyncHandler(async (req, res) => {
       res.status(500).json({ message: "Server Error" });
     }
   });
+  // const getAllFeaturesDetails = asyncHandler(async (req, res) => {
+  //   try {
+  //     const features = await Features.find();
+  //     res.json(features);
+  //   } catch (error) {
+  //    res.status(500).json({
+  //      status: "fail",
+  //      message: "An error occurred while fetching users.",
+  //    });
+  //   }
+  // });
+
   const getAllFeaturesDetails = asyncHandler(async (req, res) => {
     try {
-      const features = await Features.find();
+      const features = await Features.find().sort({ order: 1 }); // Order by the 'order' field in ascending order
       res.json(features);
     } catch (error) {
-     res.status(500).json({
-       status: "fail",
-       message: "An error occurred while fetching users.",
-     });
+      res.status(500).json({
+        status: "fail",
+        message: "An error occurred while fetching features.",
+      });
     }
   });
 
+const updateFeaturesOrder = asyncHandler(async (req, res) => {
+  const updatedOrder = req.body;
+
+  try {
+    // Loop through the updated order array and update each feature's order in the database
+    for (const feature of updatedOrder) {
+      await Features.findByIdAndUpdate(feature.id, { order: feature.order });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Feature order updated successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "fail",
+      message: "An error occurred while updating feature order.",
+    });
+  }
+});
 
 const createLocations = asyncHandler(async (req, res) => {
     try {
@@ -264,5 +296,6 @@ module.exports = {
   editFeature,
   deleteLocation,
   editLocation,
+  updateFeaturesOrder,
 };
   
