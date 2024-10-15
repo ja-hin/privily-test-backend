@@ -77,7 +77,7 @@ const createPayment = async (req, res) => {
     };
 
     await axios.post(
-      "https://privily-backend-new-1.onrender.com/api/transactions",
+      "https://privily.co/api/transactions",
       transactionData
     );
 
