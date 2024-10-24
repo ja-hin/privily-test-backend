@@ -92,6 +92,14 @@ var productSchema = new mongoose.Schema(
       type: String,
       default: 0,
     },
+    serial: {
+      type: String,
+      default: 0,
+    },
+    password: {
+      type: String,
+      required: true,
+    },
     totalRating: {
       type: String,
       default: 0,

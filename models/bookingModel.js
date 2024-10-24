@@ -43,6 +43,18 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    Userid:{
+      type: String,
+      required: true,
+    },
+    serial:{
+      type: String,
+      required: true,
+    },
+    password:{
+      type: String,
+      required: true,
+    },
     status: {
       type: String,
       enum: [

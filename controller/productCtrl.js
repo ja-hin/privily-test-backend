@@ -68,6 +68,8 @@ const createProduct = asyncHandler(async (req, res) => {
     req.body.deviceId = req.body.deviceId;
     req.body.userId = req.body.userId;
     req.body.direction = req.body.direction; // New field for direction
+    req.body.serial=req.body.serial;
+    req.body.password=req.body.password;
 
     const newProduct = await Product.create(req.body);
     res.json(newProduct);

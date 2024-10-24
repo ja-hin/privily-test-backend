@@ -1093,15 +1093,7 @@ const createBooking = asyncHandler(async (req, res) => {
       shortDescription,
     } = req.body;
 
-    console.log("Booking creation started:", {
-      _id,
-      podId,
-      bookingDate,
-      startTime,
-      endTime,
-      timeSlotNumber,
-      bookingPurpose,
-    });
+    console.log("Booking creation started:", req.body);
 
     const user = await User.findById(_id);
     if (!user) {
@@ -1112,10 +1104,11 @@ const createBooking = asyncHandler(async (req, res) => {
     if (!pod) {
       return res.status(404).json({ message: "Pod not found" });
     }
-
+console.log("pod",pod)
     const deviceId = pod.deviceId;
     const UserID = pod.UserId;
-
+    const serial = pod.serial;
+    const password = pod.password;
     // const bookingDateObj = moment.tz(bookingDate, "Africa/Johannesburg").toDate();
     // const startTimeObj = moment.tz(startTime, "Africa/Johannesburg").toDate();
     // const endTimeObj = moment.tz(endTime, "Africa/Johannesburg").toDate();
@@ -1124,6 +1117,8 @@ const createBooking = asyncHandler(async (req, res) => {
     const endTimeObj = moment(endTime).toDate();
     console.log("startTimeObj:", startTimeObj);
     console.log("endTimeObj:", endTimeObj);
+    console.log("bookingDateObj:", bookingDateObj);
+
     console.log("START_TIME:", START_TIME);
 
     const existingBooking = await Booking.findOne({
@@ -1165,6 +1160,9 @@ const createBooking = asyncHandler(async (req, res) => {
     const newBooking = await Booking.create({
       user: user._id,
       podId,
+      serial:serial,
+      password:password,
+      Userid:UserID,
       bookingDate: bookingDateObj,
       startTime: startTimeObj,
       endTime: endTimeObj,
