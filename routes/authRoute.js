@@ -87,7 +87,7 @@ router.get("/all-bookingsByUser", authMiddleware, getBookingsByUser);
 router.get("/all-bookings", authMiddleware, isAdmin, getBookings);
 
 router.get("/booking/:id", authMiddleware, getBookingById);
-router.put("/update-booking/:id", authMiddleware, updateBookingById);
+router.put("/update-booking/:id", updateBookingById);
 router.put("/cancel-booking/:id", cancelBooking);
 router.put("/feedback/:id",  bookingFeedback);
 router.get("/:id", authMiddleware, isAdmin, getaUser);
