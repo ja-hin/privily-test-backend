@@ -226,7 +226,10 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
   } else {
     res
       .status(401)
-      .json({ message: "Invalid email or password. Please try again.",status:400 });
+      .json({
+        message: "Invalid email or password. Please try again.",
+        status: 400,
+      });
   }
 });
 
@@ -1104,7 +1107,7 @@ const createBooking = asyncHandler(async (req, res) => {
     if (!pod) {
       return res.status(404).json({ message: "Pod not found" });
     }
-console.log("pod",pod)
+    console.log("pod", pod);
     const deviceId = pod.deviceId;
     const UserID = pod.UserId;
     const serial = pod.serial;
@@ -1160,9 +1163,9 @@ console.log("pod",pod)
     const newBooking = await Booking.create({
       user: user._id,
       podId,
-      serial:serial,
-      password:password,
-      Userid:UserID,
+      serial: serial,
+      password: password,
+      Userid: UserID,
       bookingDate: bookingDateObj,
       startTime: startTimeObj,
       endTime: endTimeObj,
@@ -1196,14 +1199,14 @@ console.log("pod",pod)
       },
     });
 
-    console.log("Product availablity backend",productAvailability)
+    console.log("Product availablity backend", productAvailability);
 
     if (productAvailability) {
       // console.log("times: ", startTimeObj, endTimeObj);
       let updatedSlotBookings = productAvailability.slot_bookings;
       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
-      console.log("Indices: ",startingIndex, endingIndex)
+      console.log("Indices: ", startingIndex, endingIndex);
       for (let i = startingIndex; i < endingIndex; i++) {
         updatedSlotBookings[i] = true;
         console.log(`Slot ${i} marked as true`);
@@ -1221,7 +1224,7 @@ console.log("pod",pod)
         { slot_bookings: updatedSlotBookings },
         { new: true }
       );
-      console.log("hg",newAvailablity);
+      console.log("hg", newAvailablity);
     } else {
       const indexes = (END_TIME - START_TIME) * 4;
       const slotBookings = Array.from({ length: indexes }, () => false);
@@ -1260,7 +1263,6 @@ console.log("pod",pod)
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 
 const sendNotificationOnBooking = asyncHandler(
   async (user = null, booking, userId = null) => {
@@ -1432,7 +1434,7 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
   validateMongoDbId(_id);
   try {
     // Call updateBookingStatusAutomatically function
-    await updateBookingStatusAutomatically(req, res, async () => { });
+    await updateBookingStatusAutomatically(req, res, async () => {});
 
     const user = await User.findById(_id).populate("booking");
     if (!user) {
@@ -1461,7 +1463,7 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
 const getBookings = asyncHandler(async (req, res) => {
   try {
     // Call updateBookingStatusAutomatically function
-    await updateBookingStatusAutomatically(req, res, async () => { });
+    await updateBookingStatusAutomatically(req, res, async () => {});
 
     const allBookings = await Booking.find();
     res.json(allBookings);
@@ -1584,10 +1586,18 @@ const cancelBooking = asyncHandler(async (req, res) => {
     }
 
     // If status is pending or confirmed, update status to "Cancelled"
-    booking.status = "Cancelled";
+    updatedStatus = "Cancelled";
     sendNotificationOnCancel(booking.user._id, booking._id);
-    booking.isBookingActive = false;
-    await booking.save();
+    updatedIsBookingActive = false;
+    try {
+      // await booking.save();
+      const updatedBooking = await Booking.findByIdAndUpdate(booking._id, {
+        status: updatedStatus,
+        isBookingActive: updatedIsBookingActive,
+      });
+    } catch (error) {
+      console.log("booking save nahi ho rahi hai", error);
+    }
 
     // Update product availability
     const productAvailability = await ProductAvailability.findOne({
@@ -1688,6 +1698,7 @@ const bookingFeedback = asyncHandler(async (req, res) => {
 const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
   validateMongoDbId(userId);
   validateMongoDbId(bookingId);
+
   try {
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
@@ -1724,7 +1735,6 @@ const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
       `;
       user.lastBookingStatus = booking.status; // Update user's last booking status
     }
-
     // If email content exists, send email
     if (emailContent) {
       const data = {
@@ -1732,8 +1742,8 @@ const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
         subject: "Booking Cancellation Notification",
         html: emailContent,
       };
+
       await sendEmail(data.to, data.subject, data.html); // Send email
-      await booking.save(); // Save changes to booking
     }
 
     await user.save(); // Save changes to user
@@ -1890,24 +1900,35 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
 
   try {
     const now = new Date();
-const updatedTime = new Date(now.setHours(now.getHours() + 2));
+    const updatedTime = new Date(now.setHours(now.getHours() + 2));
     // Find all active bookings
     const bookings = await Booking.find({
       user: _id,
       isBookingActive: true,
       status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] },
     }).populate("user");
-
+    let updatedStatus = bookings.status;
+    let updatedIsBookingActive = bookings.isBookingActive
+    let updatedBooking;
     // Update booking statuses
     const updatedBookings = await Promise.all(
       bookings.map(async (booking) => {
-        if (booking.startTime <= updatedTime && updatedTime < booking.endTime) {
-          booking.status = "Processing";
-        } else if (updatedTime >= booking.endTime) {
-          booking.status = "Completed";
-          booking.isBookingActive = false;
+        if (bookings.startTime <= updatedTime && updatedTime < bookings.endTime) {
+          updatedStatus = "Processing";
+        } else if (updatedTime >= bookings.endTime) {
+          updatedStatus = "Completed";
+          updatedIsBookingActive = false;
         }
-        return await booking.save();
+        try {
+           // await booking.save();
+           updatedBooking = await Booking.findByIdAndUpdate(bookings._id, {
+             status: updatedStatus,
+             isBookingActive: updatedIsBookingActive,
+           });
+         } catch (error) {
+           console.log("booking save nahi ho rahi hai", error);
+         }
+         return updatedBooking;
       })
     );
 
@@ -1928,7 +1949,6 @@ const updatedTime = new Date(now.setHours(now.getHours() + 2));
     }
   }
 };
-
 
 // rating a booking after completion of booking by user if status is Completed
 // const rateBooking = asyncHandler(async (req, res) => {
@@ -2077,7 +2097,6 @@ const rateBooking = async (req, res) => {
   }
 };
 
-
 // Update booking status as per the status provided by admin to manage booking status
 const updateBookingStatusByAdmin = asyncHandler(async (req, res) => {
   const { status } = req.body;
@@ -2146,7 +2165,7 @@ const sendNotification = asyncHandler(async (req, res) => {
 
 const getAllNotification = asyncHandler(async (req, res) => {
   const user = req.user;
-  await updateBookingStatusAutomatically(req, res, async () => { });
+  await updateBookingStatusAutomatically(req, res, async () => {});
   const bookings = await Booking.find({
     user: user._id,
     status: "Completed",
@@ -2158,7 +2177,7 @@ const getAllNotification = asyncHandler(async (req, res) => {
         "This is regarding your last booking on " +
         booking.bookingDate.toString(),
       booking_id: booking._id,
-      podId:booking.podId,
+      podId: booking.podId,
       icon: "icon to send",
       type: "Rating", // as per this type, frontend will redirect to feedback mark page.
     });
