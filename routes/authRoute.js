@@ -43,6 +43,7 @@ const {
   unblockStaff,
   deleteStaff,
   editStaff,
+  updatebookingstatus,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -99,6 +100,10 @@ router.put(
   "/auto-update-booking-status",
   authMiddleware,
   updateBookingStatusAutomatically
+);
+router.put(
+  "/update-booking-status/:id",
+  updatebookingstatus
 );
 
 router.put(

@@ -7,6 +7,10 @@ const bookingSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+  podTitle:{
+     type: String,
+      required: true,
+  },
     podId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",

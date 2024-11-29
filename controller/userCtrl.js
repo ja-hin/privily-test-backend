@@ -12,10 +12,11 @@ const MobileUserModel = require("../models/mobileUserModel");
 const ProductAvailability = require("../models/productAvailability");
 const { START_TIME, END_TIME } = require("./constants");
 const Corporate = require("../models/corporateModel");
-const moment = require("moment-timezone");
+// const moment = require("moment-timezone");
+const moment = require("moment");
 const productModel = require("../models/productModel");
 const registerstaff = require("../models/registerstaff");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const { register } = require("module");
 
 const twilioClient = twilio(
@@ -224,12 +225,10 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
       token: generateToken(findStaff._id),
     });
   } else {
-    res
-      .status(401)
-      .json({
-        message: "Invalid email or password. Please try again.",
-        status: 400,
-      });
+    res.status(401).json({
+      message: "Invalid email or password. Please try again.",
+      status: 400,
+    });
   }
 });
 
@@ -1094,6 +1093,7 @@ const createBooking = asyncHandler(async (req, res) => {
       timeSlotNumber,
       bookingPurpose,
       shortDescription,
+      status,
     } = req.body;
 
     console.log("Booking creation started:", req.body);
@@ -1108,6 +1108,7 @@ const createBooking = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "Pod not found" });
     }
     console.log("pod", pod);
+    const podstitle = pod.title; // Retrieve the pod title
     const deviceId = pod.deviceId;
     const UserID = pod.UserId;
     const serial = pod.serial;
@@ -1163,6 +1164,8 @@ const createBooking = asyncHandler(async (req, res) => {
     const newBooking = await Booking.create({
       user: user._id,
       podId,
+      // podTitle:podTitle,
+      podTitle:podstitle,
       serial: serial,
       password: password,
       Userid: UserID,
@@ -1172,7 +1175,7 @@ const createBooking = asyncHandler(async (req, res) => {
       timeSlotNumber,
       bookingPurpose,
       shortDescription: shortDescription || null,
-      status: "Pending",
+      status: status,
       qrCodeData: qrCodeDataString,
       feedback: {
         message: null,
@@ -1256,7 +1259,9 @@ const createBooking = asyncHandler(async (req, res) => {
     console.log("Booking created successfully:", newBooking._id);
     res.status(201).json({
       message: "Booking created successfully",
-      booking: newBooking,
+      booking: {
+        ...newBooking.toObject(),
+      },
     });
   } catch (error) {
     console.error("Error creating booking:", error);
@@ -1441,6 +1446,7 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
     const bookings = user.booking;
+    console.log("bookings", bookings);
     res.json(bookings);
   } catch (error) {
     console.error("Error fetching bookings by user:", error); // Log the error for debugging
@@ -1460,6 +1466,7 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
 //     throw new Error(error);
 //   }
 // });
+
 const getBookings = asyncHandler(async (req, res) => {
   try {
     // Call updateBookingStatusAutomatically function
@@ -1594,7 +1601,7 @@ const cancelBooking = asyncHandler(async (req, res) => {
       const updatedBooking = await Booking.findByIdAndUpdate(booking._id, {
         status: updatedStatus,
         isBookingActive: updatedIsBookingActive,
-      });
+      }, {new:true});
     } catch (error) {
       console.log("booking save nahi ho rahi hai", error);
     }
@@ -1899,8 +1906,10 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
   validateMongoDbId(_id);
 
   try {
-    const now = new Date();
-    const updatedTime = new Date(now.setHours(now.getHours() + 2));
+    // const now = new Date();
+    // const updatedTime = new Date(now.setHours(now.getHours() + 2));
+    const now = moment();
+    const updatedTime = now.add(2, "hours");
     // Find all active bookings
     const bookings = await Booking.find({
       user: _id,
@@ -1908,27 +1917,42 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
       status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] },
     }).populate("user");
     let updatedStatus = bookings.status;
-    let updatedIsBookingActive = bookings.isBookingActive
+    let updatedIsBookingActive = bookings.isBookingActive;
     let updatedBooking;
     // Update booking statuses
     const updatedBookings = await Promise.all(
       bookings.map(async (booking) => {
-        if (bookings.startTime <= updatedTime && updatedTime < bookings.endTime) {
+        console.log("bookingsimp", bookings.startTime <= updatedTime);
+        console.log("bookingsimp11", booking);
+        if (
+          booking.startTime.isBefore(updatedTime) &&
+          updatedTime.isBefore(booking.endTime)
+        )
+        
+        {
+          if(booking.status==="Cancelled"){
+            updatedStatus = "Cancelled";
+          }else{
           updatedStatus = "Processing";
-        } else if (updatedTime >= bookings.endTime) {
-          updatedStatus = "Completed";
+          }
+        } else if (updatedTime.isAfter(bookings.endTime)) {
+          if (booking.status === "Cancelled") {
+            updatedStatus = "Cancelled";
+          } else {
+            updatedStatus = "Completed";
+          }
           updatedIsBookingActive = false;
         }
         try {
-           // await booking.save();
-           updatedBooking = await Booking.findByIdAndUpdate(bookings._id, {
-             status: updatedStatus,
-             isBookingActive: updatedIsBookingActive,
-           });
-         } catch (error) {
-           console.log("booking save nahi ho rahi hai", error);
-         }
-         return updatedBooking;
+          // await booking.save();
+          updatedBooking = await Booking.findByIdAndUpdate(booking._id, {
+            status: updatedStatus,
+            isBookingActive: updatedIsBookingActive,
+          });
+        } catch (error) {
+          console.log("booking save nahi ho rahi hai", error);
+        }
+        return updatedBooking;
       })
     );
 
@@ -1950,6 +1974,24 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
   }
 };
 
+const updatebookingstatus = async (req, res) => {
+  const { status } = req.body;
+
+  const bookingId = req.params.id;
+
+  const booking = await Booking.findById(bookingId);
+
+  if (!booking) {
+    return res.status(400).json({ message: "Booking not found !!!" });
+  }
+
+  const updatedBooking = await Booking.findByIdAndUpdate(
+    bookingId,
+    { $set: { status } },
+    { new: true }
+  );
+  return res.status(200).json({ updatedBooking });
+};
 // rating a booking after completion of booking by user if status is Completed
 // const rateBooking = asyncHandler(async (req, res) => {
 //   const { id } = req.params;
@@ -2065,9 +2107,18 @@ const rateBooking = async (req, res) => {
     }
 
     // Save feedback in Booking
-    booking.feedback = { rating, message };
-    booking.status = "Rated";
-    await booking.save();
+    // booking.feedback = { rating, message };
+    // booking.status = "Rated";
+    // await Booking.findByIdAndUpdate(
+    //   bookingId,
+    //   { status: "Rated", feedback: { rating, message } },
+    //   { new: true }
+    // );
+ const updatedratedBooking= await Booking.findByIdAndUpdate(
+      bookingId,
+      { $set: { status: "Rated", feedback: { rating, message } } },
+      { new: true }
+    );
 
     // Find the corresponding product by product ID
     const product = await productModel.findById(productId);
@@ -2089,7 +2140,7 @@ const rateBooking = async (req, res) => {
     // Send the response back with both booking and product
     res.status(200).json({
       message: "Rating submitted successfully for both booking and product",
-      booking,
+      updatedratedBooking,
       product,
     });
   } catch (error) {
@@ -2213,6 +2264,7 @@ module.exports = {
   updateBookingById,
   updateBookingStatusAutomatically,
   updateBookingStatusByAdmin,
+  updatebookingstatus,
   setCurrentLocation,
   sendNotification,
   rateBooking,

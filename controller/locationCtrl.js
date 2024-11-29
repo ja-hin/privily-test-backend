@@ -241,7 +241,6 @@ const editFeature = asyncHandler(async (req, res) => {
 });
 
 const editLocation = asyncHandler(async (req, res) => {
-  console.log("req.user:", req.user); // Add this line to debug
   const { id } = req.params;
   const {
     name,

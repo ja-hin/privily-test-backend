@@ -61,7 +61,7 @@
 
 
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 
 // Define the Schema for staff members
 const staffSchema = new mongoose.Schema(

@@ -1,17 +1,18 @@
+const discountModel = require("../models/discountModel");
 const RateModel = require("../models/rateModel");
 const Transaction = require("../models/Transaction");
 const asyncHandler = require("express-async-handler");
 
 const saveTransaction = async (req, res) => {
   try {
-    const { amount, currency, id, metadata, status, merchantId } = req.body;
+    const { amount, currency, id, checkoutId,paymentFacilitator, status, merchantId } = req.body;
     const transactionData = {
       amount,
       currency,
       id: id,
       merchantId: merchantId,
-      checkoutId: metadata.checkoutId,
-      paymentFacilitator: metadata.paymentFacilitator,
+      checkoutId: checkoutId,
+      paymentFacilitator: paymentFacilitator,
       status,
     };
 
@@ -67,6 +68,31 @@ const getAllTransactions = async (req, res) => {
    }
  });
 
+ const createDiscount = asyncHandler(async (req, res) => {
+   try {
+     const { discount } = req.body;
+
+     // Find the rate document (assuming there's only one rate document)
+     let existingDiscount = await discountModel.findOne();
+
+     if (existingDiscount) {
+       // If a rate document exists, update it
+       existingDiscount.discount = discount;
+       await existingDiscount.save();
+     } else {
+       // If no rate document exists, create a new one
+       existingDiscount = await discountModel.create({ discount });
+     }
+
+     res.json(existingDiscount);
+   } catch (error) {
+     console.log(error.message);
+     res.status(500).json({
+       status: "fail",
+       message: "An error occurred while creating or updating the Rate.",
+     });
+   }
+ });
  const getRate = asyncHandler(async (req, res) => {
    try {
      // Assuming there's only one rate record in the database
@@ -86,7 +112,32 @@ const getAllTransactions = async (req, res) => {
      });
    }
  });
+const getDiscount = asyncHandler(async (req, res) => {
+  try {
+    // Assuming there's only one rate record in the database
+    const discount = await discountModel.findOne();
+    if (!discount) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Rate not found",
+      });
+    }
+    res.json(discount);
+  } catch (error) {
+    console.error("Error fetching rate:", error);
+    res.status(500).json({
+      status: "fail",
+      message: "An error occurred while fetching the rate.",
+    });
+  }
+});
 
 
-
-module.exports = { saveTransaction, getAllTransactions, createRate, getRate };
+module.exports = {
+  saveTransaction,
+  getAllTransactions,
+  createRate,
+  getRate,
+  createDiscount,
+  getDiscount,
+};
