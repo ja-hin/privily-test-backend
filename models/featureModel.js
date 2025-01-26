@@ -10,6 +10,10 @@ var featureSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  icon:{
+        type: String,
+    required: true,
+  },
   order: {
     type: Number, // Add this field to store the order of features
     required: true,

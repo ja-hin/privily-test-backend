@@ -104,8 +104,8 @@ const createLocations = asyncHandler(async (req, res) => {
   });
   const createFeature = asyncHandler(async (req, res) => {
     try {
-      const { name, status } = req.body;
-      const newFeature = await Features.create({ name, status });
+      const { name, status, icon, order } = req.body;
+      const newFeature = await Features.create({ name, status, icon, order });
 
       res.json(newFeature);
     } catch (error) {
@@ -219,14 +219,14 @@ const deleteLocation = asyncHandler(async (req, res) => {
 });
 const editFeature = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, status, isBlocked } = req.body;
+  const { name, status, isBlocked, icon } = req.body;
 
   validateMongoDbId(id);
 
   try {
     const updatedFeature = await Features.findByIdAndUpdate(
       id,
-      { name, status, isBlocked },
+      { name, status, isBlocked, icon },
       { new: true, runValidators: true }
     );
 
