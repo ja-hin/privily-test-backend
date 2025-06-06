@@ -12,6 +12,10 @@ var productSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    rate:{
+      type:Number,
+      required: true
+    },
     slug: {
       type: String,
       required: true,
@@ -104,6 +108,10 @@ var productSchema = new mongoose.Schema(
       type: String,
       default: 0,
     },
+email:{
+      type:String,
+      required:true
+    }
   },
   { timestamps: true }
 );

@@ -18,7 +18,7 @@ const productModel = require("../models/productModel");
 const registerstaff = require("../models/registerstaff");
 const bcrypt = require("bcryptjs");
 const { register } = require("module");
-
+const PDFDocument = require("pdfkit");
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
@@ -1113,6 +1113,7 @@ const createBooking = asyncHandler(async (req, res) => {
     const UserID = pod.UserId;
     const serial = pod.serial;
     const password = pod.password;
+const hostemail= pod.email
     // const bookingDateObj = moment.tz(bookingDate, "Africa/Johannesburg").toDate();
     // const startTimeObj = moment.tz(startTime, "Africa/Johannesburg").toDate();
     // const endTimeObj = moment.tz(endTime, "Africa/Johannesburg").toDate();
@@ -1256,6 +1257,7 @@ const createBooking = asyncHandler(async (req, res) => {
     // };
 
     sendNotificationOnBooking(user, newBooking);
+    sendNotificationOnHost(user, newBooking, hostemail);
     console.log("Booking created successfully:", newBooking._id);
     res.status(201).json({
       message: "Booking created successfully",
@@ -1271,6 +1273,7 @@ const createBooking = asyncHandler(async (req, res) => {
 
 const sendNotificationOnBooking = asyncHandler(
   async (user = null, booking, userId = null) => {
+   console.log("bookingimp", booking)
     try {
       if (!user && !userId) {
         throw new Error("Any one of User or UserId is required");
@@ -1302,6 +1305,7 @@ const sendNotificationOnBooking = asyncHandler(
         <li><strong>Start Time:</strong> ${formattedStartTime}</li>
         <li><strong>End Time:</strong> ${formattedEndTime}</li>
         <li><strong>Pod ID:</strong> ${booking.podId}</li>
+        <li><strong>Pod Title:</strong> ${booking.podTitle}</li>
       </ul>
       <p>Thank you for booking with us!</p>
     `;
@@ -1321,6 +1325,50 @@ const sendNotificationOnBooking = asyncHandler(
   }
 );
 
+const sendNotificationOnHost = asyncHandler(
+  async (user = null, booking, hostemail) => {
+    try {
+      booking = booking.populate("podId");
+      if (!booking) throw new Error("Booking not found");
+
+      // Format booking date and times
+      const formattedBookingDate = booking.bookingDate.toDateString();
+      const formattedStartTime = moment(booking.startTime)
+        // .tz("Africa/Johannesburg")
+        .format("hh:mm A");
+      const formattedEndTime = moment(booking.endTime)
+        // .tz("Africa/Johannesburg")
+        .format("hh:mm A");
+
+      // Construct email content
+      const emailContent = `
+      <p>This booking is for ${user.firstname},</p>
+      <p>His booking details are:</p>
+      <ul>
+        <li><strong>Booking ID:</strong> ${booking._id}</li>
+        <li><strong>Booking Date:</strong> ${formattedBookingDate}</li>
+        <li><strong>Start Time:</strong> ${formattedStartTime}</li>
+        <li><strong>End Time:</strong> ${formattedEndTime}</li>
+        <li><strong>Pod ID:</strong> ${booking.podId}</li>
+        <li><strong>Pod ID:</strong> ${booking.podTitle}</li>
+      </ul>
+      <p>Thank you for booking with us!</p>
+    `;
+
+      // Send email
+      const data = {
+        to: hostemail,
+        subject: "Booking Notification",
+        html: emailContent,
+      };
+      await sendEmail(data.to, data.subject, data.html);
+      console.log("Email sent successfully.");
+    } catch (error) {
+      console.error("Error sending notification:", error.message);
+      throw new Error("Failed to send notification");
+    }
+  }
+);
 //extend booking time
 const extendBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
@@ -1490,6 +1538,104 @@ const getBookingById = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
+// Add this in your booking controller file:
+
+
+const generateInvoicePdfBuffer = (booking, user) => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument();
+    const buffers = [];
+
+    doc.on("data", buffers.push.bind(buffers));
+    doc.on("end", () => {
+      const pdfData = Buffer.concat(buffers);
+      resolve(pdfData);
+    });
+
+    // Compose PDF content
+    doc.fontSize(20).text("Invoice for your Booking", { align: "center" });
+    doc.moveDown();
+
+    doc.fontSize(14).text(`Booking ID: ${booking._id}`);
+    doc.text(`Name: ${user.firstname} ${user.lastname}`);
+    doc.text(`Email: ${user.email}`);
+    doc.text(`Booking Date: ${booking.bookingDate.toDateString()}`);
+    doc.text(`Start Time: ${booking.startTime.toLocaleTimeString()}`);
+    doc.text(`End Time: ${booking.endTime.toLocaleTimeString()}`);
+    doc.text(`Purpose: ${booking.bookingPurpose || "N/A"}`);
+
+    // Add more invoice details like price, taxes, total etc.
+    doc.moveDown();
+    doc.text(`Total Amount: ZAR XXXX`); // You can calculate or fetch this from booking/payment info
+
+    doc.end();
+  });
+};
+
+const sendInvoiceEmailWithAttachment = async (booking, user) => {
+  const pdfBuffer = await generateInvoicePdfBuffer(booking, user);
+
+  const mailOptions = {
+    to: user.email,
+    subject: "Your Booking Invoice",
+    html: `<p>Dear ${user.firstname},</p><p>Please find attached the invoice for your booking.</p>`,
+    attachments: [
+      {
+        filename: `invoice_${booking._id}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ],
+  };
+
+  await sendEmail(
+    mailOptions.to,
+    mailOptions.subject,
+    mailOptions.html,
+    mailOptions.attachments
+  );
+};
+const sendInvoiceEmail = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  validateMongoDbId(bookingId);
+
+  const booking = await Booking.findById(bookingId).populate("user");
+  if (!booking) {
+    return res.status(404).json({ message: "Booking not found" });
+  }
+
+  const user = booking.user;
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  await sendInvoiceEmailWithAttachment(booking, user);
+
+  res.json({ message: "Invoice PDF sent successfully" });
+});
+
+
+// const sendInvoiceEmail = asyncHandler(async (req, res) => {
+//   const { bookingId } = req.params;
+//   validateMongoDbId(bookingId);
+
+//   const booking = await Booking.findById(bookingId).populate('user');
+//   if (!booking) {
+//     return res.status(404).json({ message: 'Booking not found' });
+//   }
+
+//   const user = booking.user;
+//   if (!user) {
+//     return res.status(404).json({ message: 'User not found' });
+//   }
+
+//   // Compose invoice email html (you can reuse your invoice generator)
+//   const invoiceHtml = generateInvoiceHtml(booking, user);
+
+//   await sendEmail(user.email, 'Your Booking Invoice - Privily', invoiceHtml);
+
+//   res.json({ message: 'Invoice email sent successfully' });
+// });
 
 // update booking by id
 const updateBookingById = asyncHandler(async (req, res) => {
@@ -1509,6 +1655,7 @@ const updateBookingById = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
+
 const sendNotificationOnUpdate = asyncHandler(
   async (userId, bookingId, updatedFields) => {
     validateMongoDbId(userId);
@@ -2279,4 +2426,5 @@ module.exports = {
   unblockStaff,
   deleteStaff,
   editStaff,
+  sendInvoiceEmail,
 };

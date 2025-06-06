@@ -44,6 +44,7 @@ const {
   deleteStaff,
   editStaff,
   updatebookingstatus,
+  sendInvoiceEmail,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -94,7 +95,7 @@ router.put("/feedback/:id",  bookingFeedback);
 router.get("/:id", authMiddleware, isAdmin, getaUser);
 router.post("/corporate-pods", corporatePods);
 router.post('/extend/:bookingId', authMiddleware, extendBooking);
-
+router.post("/send-invoice/:bookingId", authMiddleware, sendInvoiceEmail);
 
 router.put(
   "/auto-update-booking-status",

@@ -14,6 +14,10 @@ var featureSchema = new mongoose.Schema({
     type: Number, // Add this field to store the order of features
     required: true,
   },
+icon:{
+  type: String,
+    required: true,
+}
 });
 
 //Export the model

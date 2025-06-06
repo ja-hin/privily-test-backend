@@ -70,6 +70,10 @@ const createProduct = asyncHandler(async (req, res) => {
     req.body.direction = req.body.direction; // New field for direction
     req.body.serial=req.body.serial;
     req.body.password=req.body.password;
+req.body.email=req.body.email;
+req.body.rate = req.body.rate;
+
+
 
     const newProduct = await Product.create(req.body);
     res.json(newProduct);
@@ -253,6 +257,8 @@ const editPods = asyncHandler(async (req, res) => {
     isAvailable,
     images,
     tags,
+    email,
+    rate,
   } = req.body;
 
   validateMongoDbId(id);
@@ -276,6 +282,8 @@ const editPods = asyncHandler(async (req, res) => {
         isAvailable,
         images,
         tags,
+        email,
+        rate,
       },
       { new: true, runValidators: true }
     );
