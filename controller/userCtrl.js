@@ -1541,9 +1541,41 @@ const getBookingById = asyncHandler(async (req, res) => {
 // Add this in your booking controller file:
 
 
+// const generateInvoicePdfBuffer = (booking, user) => {
+//   return new Promise((resolve, reject) => {
+//     const doc = new PDFDocument();
+//     const buffers = [];
+
+//     doc.on("data", buffers.push.bind(buffers));
+//     doc.on("end", () => {
+//       const pdfData = Buffer.concat(buffers);
+//       resolve(pdfData);
+//     });
+
+//     // Compose PDF content
+//     doc.fontSize(20).text("Invoice for your Booking", { align: "center" });
+//     doc.moveDown();
+
+//     doc.fontSize(14).text(`Booking ID: ${booking._id}`);
+//     doc.text(`Name: ${user.firstname} ${user.lastname}`);
+//     doc.text(`Email: ${user.email}`);
+//     doc.text(`Booking Date: ${booking.bookingDate.toDateString()}`);
+//     doc.text(`Start Time: ${booking.startTime.toLocaleTimeString()}`);
+//     doc.text(`End Time: ${booking.endTime.toLocaleTimeString()}`);
+//     doc.text(`Purpose: ${booking.bookingPurpose || "N/A"}`);
+
+//     // Add more invoice details like price, taxes, total etc.
+//     doc.moveDown();
+//     doc.text(`Total Amount: ZAR XXXX`); // You can calculate or fetch this from booking/payment info
+
+//     doc.end();
+//   });
+// };
+
+
 const generateInvoicePdfBuffer = (booking, user) => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ margin: 50 });
     const buffers = [];
 
     doc.on("data", buffers.push.bind(buffers));
@@ -1552,25 +1584,105 @@ const generateInvoicePdfBuffer = (booking, user) => {
       resolve(pdfData);
     });
 
-    // Compose PDF content
-    doc.fontSize(20).text("Invoice for your Booking", { align: "center" });
+    // COMPANY HEADER
+    doc.fontSize(16).text("Privily (Pty) Ltd", { align: "left" });
+    doc.fontSize(10).text("Reg. No.: 2023/832609/07");
+    doc.text("9 Mt. Orville, Midlands Estate, Midstream");
+    doc.text("Vat No.: 4890315445");
+    doc.text("Ph: (+27) 082 4412152 / (+27) 083 212 8647");
     doc.moveDown();
 
-    doc.fontSize(14).text(`Booking ID: ${booking._id}`);
-    doc.text(`Name: ${user.firstname} ${user.lastname}`);
-    doc.text(`Email: ${user.email}`);
-    doc.text(`Booking Date: ${booking.bookingDate.toDateString()}`);
-    doc.text(`Start Time: ${booking.startTime.toLocaleTimeString()}`);
-    doc.text(`End Time: ${booking.endTime.toLocaleTimeString()}`);
-    doc.text(`Purpose: ${booking.bookingPurpose || "N/A"}`);
+    // INVOICE METADATA
+    doc
+      .fontSize(14)
+      .text(`Tax Invoice # ${booking.invoiceNumber || "XXXX"}`, {
+        align: "right",
+      });
+    doc
+      .fontSize(10)
+      .text(`Invoice Date: ${new Date().toLocaleDateString()}`, {
+        align: "right",
+      });
+    doc.text(
+      `Due Date: ${
+        booking.dueDate?.toLocaleDateString() || "10 days from invoice"
+      }`,
+      { align: "right" }
+    );
+    doc.text(`Invoice No.: ${booking.invoiceNumber || "0001"}`, {
+      align: "right",
+    });
 
-    // Add more invoice details like price, taxes, total etc.
     doc.moveDown();
-    doc.text(`Total Amount: ZAR XXXX`); // You can calculate or fetch this from booking/payment info
+
+    // BILL TO
+    doc.fontSize(12).text("BILL TO:", { underline: true });
+    doc.text(`${user.firstname} ${user.lastname}`);
+    doc.text(user.email);
+    if (user.company) doc.text(user.company);
+    if (user.vatNumber) doc.text(`VAT No.: ${user.vatNumber}`);
+    doc.moveDown();
+
+    // TABLE HEADER
+    doc.font("Helvetica-Bold");
+    doc.text("DESCRIPTION", 50, doc.y, { continued: true });
+    doc.text("UNIT", 250, doc.y, { continued: true });
+    doc.text("QTY", 300, doc.y, { continued: true });
+    doc.text("DURATION", 350, doc.y, { continued: true });
+    doc.text("RATE", 420, doc.y, { continued: true });
+    doc.text("TOTAL", 480, doc.y);
+    doc.moveDown();
+    doc.font("Helvetica");
+
+    // SAMPLE LINE ITEMS (You can replace this with dynamic data)
+    booking.items.forEach((item) => {
+      doc.text(item.description, 50, doc.y, { continued: true });
+      doc.text(item.unit, 250, doc.y, { continued: true });
+      doc.text(item.qty.toString(), 300, doc.y, { continued: true });
+      doc.text(item.duration, 350, doc.y, { continued: true });
+      doc.text(`R ${item.rate.toLocaleString()}`, 420, doc.y, {
+        continued: true,
+      });
+      doc.text(`R ${item.total.toLocaleString()}`, 480, doc.y);
+      doc.moveDown();
+    });
+
+    // TOTALS
+    doc.moveDown();
+    const subtotal = booking.subtotal || 24000;
+    const vat = booking.vat || subtotal * 0.15;
+    const total = subtotal + vat;
+
+    doc.font("Helvetica-Bold");
+    doc.text(`SUBTOTAL`, 420, doc.y, { continued: true });
+    doc.text(`R ${subtotal.toLocaleString()}`, 480, doc.y);
+    doc.text(`VAT`, 420, doc.y, { continued: true });
+    doc.text(`R ${vat.toLocaleString()}`, 480, doc.y);
+    doc.text(`TOTAL`, 420, doc.y, { continued: true });
+    doc.text(`R ${total.toLocaleString()}`, 480, doc.y);
+    doc.font("Helvetica");
+
+    doc.moveDown();
+
+    // BANK DETAILS
+    doc.fontSize(10);
+    doc.text("Bank Details:");
+    doc.text("Privily (Pty) Ltd");
+    doc.text("Standard Bank, Branch: 002645");
+    doc.text("Account: 10 20 085 0707");
+    doc.text("SWIFT: SBZAZAJJ");
+
+    doc.moveDown();
+    doc.text(
+      `Event: Fame Week Africa - Soundproof Pods - ${
+        booking.eventStartDate || "02 Sept 2024"
+      } to ${booking.eventEndDate || "04 Sept 2024"}`
+    );
 
     doc.end();
   });
 };
+
 
 const sendInvoiceEmailWithAttachment = async (booking, user) => {
   const pdfBuffer = await generateInvoicePdfBuffer(booking, user);
