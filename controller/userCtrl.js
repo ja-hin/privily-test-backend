@@ -36,7 +36,7 @@ const twilioClient = twilio(
 //     throw new Error("User Already Exists");
 //   }
 // });
-const createUser = asyncHandler(async (req, res) => {
+const createUser = asyncHandler(async (req, res) => { 
   const { email, phoneNumber, firstname, lastname } = req.body;
   if (!email || !phoneNumber || !firstname || !lastname) {
     return res.status(400).send("All fields are required");
@@ -1593,16 +1593,12 @@ const generateInvoicePdfBuffer = (booking, user) => {
     doc.moveDown();
 
     // INVOICE METADATA
-    doc
-      .fontSize(14)
-      .text(`Tax Invoice # ${booking.invoiceNumber || "XXXX"}`, {
-        align: "right",
-      });
-    doc
-      .fontSize(10)
-      .text(`Invoice Date: ${new Date().toLocaleDateString()}`, {
-        align: "right",
-      });
+    doc.fontSize(14).text(`Tax Invoice # ${booking.invoiceNumber || "XXXX"}`, {
+      align: "right",
+    });
+    doc.fontSize(10).text(`Invoice Date: ${new Date().toLocaleDateString()}`, {
+      align: "right",
+    });
     doc.text(
       `Due Date: ${
         booking.dueDate?.toLocaleDateString() || "10 days from invoice"
@@ -1633,21 +1629,22 @@ const generateInvoicePdfBuffer = (booking, user) => {
     doc.text("TOTAL", 480, doc.y);
     doc.moveDown();
     doc.font("Helvetica");
-
-    // SAMPLE LINE ITEMS (You can replace this with dynamic data)
-    booking.items.forEach((item) => {
-      doc.text(item.description, 50, doc.y, { continued: true });
-      doc.text(item.unit, 250, doc.y, { continued: true });
-      doc.text(item.qty.toString(), 300, doc.y, { continued: true });
-      doc.text(item.duration, 350, doc.y, { continued: true });
-      doc.text(`R ${item.rate.toLocaleString()}`, 420, doc.y, {
-        continued: true,
+    if (Array.isArray(booking.items) && booking.items.length > 0) {
+      booking.items.forEach((item) => {
+        doc.text(item.description, 50, doc.y, { continued: true });
+        doc.text(item.unit, 250, doc.y, { continued: true });
+        doc.text(item.qty.toString(), 300, doc.y, { continued: true });
+        doc.text(item.duration, 350, doc.y, { continued: true });
+        doc.text(`R ${item.rate.toLocaleString()}`, 420, doc.y, {
+          continued: true,
+        });
+        doc.text(`R ${item.total.toLocaleString()}`, 480, doc.y);
+        doc.moveDown();
       });
-      doc.text(`R ${item.total.toLocaleString()}`, 480, doc.y);
-      doc.moveDown();
-    });
-
-    // TOTALS
+    } else {
+      console.log("No items available in the booking.");
+      doc.text("No items available.", 50, doc.y);
+    }
     doc.moveDown();
     const subtotal = booking.subtotal || 24000;
     const vat = booking.vat || subtotal * 0.15;
