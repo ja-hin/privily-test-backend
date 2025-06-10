@@ -45,6 +45,7 @@ const {
   editStaff,
   updatebookingstatus,
   sendInvoiceEmail,
+  getUserByID,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -53,6 +54,7 @@ const { createPayment } = require("../controller/PaymentCtrl");
 const router = express.Router();
 
 router.post("/register", createUser);
+router.get("/get-user/:id", authMiddleware, isAdmin, getUserByID);
 router.post("/login", loginUserCtrl);
 router.get('/me', authMiddleware, getMe);
 router.post("/app-login", loginMobileUserCtrl);

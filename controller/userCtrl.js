@@ -768,6 +768,21 @@ const deleteaUser = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
+const getUserByID = asyncHandler(async (req, res) => {
+  try {
+    const UserId = req.params.id;
+    const user = await User.findById(UserId);
+
+    if (!user) {
+      return res.status(404).json({ message: "user not found" });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 //block a user
 // const blockUser = asyncHandler(async (req, res) => {
@@ -2536,4 +2551,5 @@ module.exports = {
   deleteStaff,
   editStaff,
   sendInvoiceEmail,
+  getUserByID
 };
