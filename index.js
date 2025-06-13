@@ -17,12 +17,12 @@ const Paymentrouter = require("./routes/PaymentRoute")
 const TransactionRouter = require("./routes/TransactionRouter");
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
-const cors = require("cors");
+// const cors = require("cors");
 const { createPayment } = require("./controller/PaymentCtrl");
 
 dbConnect();
 app.use(morgan("dev"));
-app.use(cors());
+// app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());

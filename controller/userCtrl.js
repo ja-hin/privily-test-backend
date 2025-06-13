@@ -336,17 +336,17 @@ const loginMobileUserCtrl = asyncHandler(async (req, res) => {
     mobileUser.otpExpires = otpExpires;
     await mobileUser.save();
 
-    await twilioClient.messages.create({
-      body: `Your Privily App One Time password is ${otp}`,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: phoneNumber,
-    });
-
     // await twilioClient.messages.create({
-    //   body: `Your Privily App One Time password is ${otp}\n\nPrivilyApp <#>\nAqYx/FD1LBD`,
+    //   body: `Your Privily App One Time password is ${otp}`,
     //   from: process.env.TWILIO_PHONE_NUMBER,
     //   to: phoneNumber,
     // });
+
+    await twilioClient.messages.create({
+      body: `Your Privily App One Time password is ${otp}\n\nPrivilyApp <#>\nAqYx/FD1LBD`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phoneNumber,
+    });
 
 
     res.send("OTP sent successfully");
