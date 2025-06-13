@@ -342,6 +342,13 @@ const loginMobileUserCtrl = asyncHandler(async (req, res) => {
       to: phoneNumber,
     });
 
+    // await twilioClient.messages.create({
+    //   body: `Your Privily App One Time password is ${otp}\n\nPrivilyApp <#>\nAqYx/FD1LBD`,
+    //   from: process.env.TWILIO_PHONE_NUMBER,
+    //   to: phoneNumber,
+    // });
+
+
     res.send("OTP sent successfully");
   } catch (error) {
     console.error(error);

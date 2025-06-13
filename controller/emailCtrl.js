@@ -20,7 +20,7 @@ const sendEmail = async (to, subject, html, attachments = []) => {
     });
 
     const mailOptions = {
-      from: '"Hey 👻" <info@privily.co>',
+      from: '"Privily" <info@privily.co>',
       to: to,
       subject: subject,
       html: html,
