@@ -2199,71 +2199,39 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
     let updatedBooking;
     // Update booking statuses
     const updatedBookings = await Promise.all(
-      // bookings.map(async (booking) => {
-      //   console.log("bookingsimp", bookings.startTime <= updatedTime);
-      //   console.log("bookingsimp11", booking);
-      //   if (
-      //     booking.startTime.isBefore(updatedTime) &&
-      //     updatedTime.isBefore(booking.endTime)
-      //   )
-        
-      //   {
-      //     if(booking.status==="Cancelled"){
-      //       updatedStatus = "Cancelled";
-      //     }else{
-      //     updatedStatus = "Processing";
-      //     }
-      //   } else if (updatedTime.isAfter(bookings.endTime)) {
-      //     if (booking.status === "Cancelled") {
-      //       updatedStatus = "Cancelled";
-      //     } else {
-      //       updatedStatus = "Completed";
-      //     }
-      //     updatedIsBookingActive = false;
-      //   }
-      //   try {
-      //     // await booking.save();
-      //     updatedBooking = await Booking.findByIdAndUpdate(booking._id, {
-      //       status: updatedStatus,
-      //       isBookingActive: updatedIsBookingActive,
-      //     });
-      //   } catch (error) {
-      //     console.log("booking save nahi ho rahi hai", error);
-      //   }
-      //   return updatedBooking;
-      // })
       bookings.map(async (booking) => {
-  const momentStart = moment(booking.startTime);
-  const momentEnd = moment(booking.endTime);
-
-  let updatedStatus = booking.status;
-  let updatedIsBookingActive = booking.isBookingActive;
-
-  if (
-    momentStart.isBefore(updatedTime) &&
-    updatedTime.isBefore(momentEnd)
-  ) {
-    updatedStatus = (booking.status === "Cancelled") ? "Cancelled" : "Processing";
-  } else if (updatedTime.isAfter(momentEnd)) {
-    updatedStatus = (booking.status === "Cancelled") ? "Cancelled" : "Completed";
-    updatedIsBookingActive = false;
-  }
-
-  try {
-    return await Booking.findByIdAndUpdate(
-      booking._id,
-      {
-        status: updatedStatus,
-        isBookingActive: updatedIsBookingActive,
-      },
-      { new: true }
-    );
-  } catch (error) {
-    console.log("booking save nahi ho rahi hai", error);
-    return null;
-  }
-})
-
+        console.log("bookingsimp", bookings.startTime <= updatedTime);
+        console.log("bookingsimp11", booking);
+        if (
+          booking.startTime.isBefore(updatedTime) &&
+          updatedTime.isBefore(booking.endTime)
+        )
+        
+        {
+          if(booking.status==="Cancelled"){
+            updatedStatus = "Cancelled";
+          }else{
+          updatedStatus = "Processing";
+          }
+        } else if (updatedTime.isAfter(bookings.endTime)) {
+          if (booking.status === "Cancelled") {
+            updatedStatus = "Cancelled";
+          } else {
+            updatedStatus = "Completed";
+          }
+          updatedIsBookingActive = false;
+        }
+        try {
+          // await booking.save();
+          updatedBooking = await Booking.findByIdAndUpdate(booking._id, {
+            status: updatedStatus,
+            isBookingActive: updatedIsBookingActive,
+          });
+        } catch (error) {
+          console.log("booking save nahi ho rahi hai", error);
+        }
+        return updatedBooking;
+      })
     );
 
     if (next) {
