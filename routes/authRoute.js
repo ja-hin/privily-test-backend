@@ -46,6 +46,7 @@ const {
   updatebookingstatus,
   sendInvoiceEmail,
   getUserByID,
+  verifyEmail,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -60,6 +61,7 @@ router.get('/me', authMiddleware, getMe);
 router.post("/app-login", loginMobileUserCtrl);
 router.post("/verify-otp", verifyMobileOtp);
 router.post("/verify-page", verifyAuthPage);
+router.post("/verify-email", verifyEmail);
 
 router.post("/register-staff", registerAndAssignRoles);
 router.get("/logout", logout);

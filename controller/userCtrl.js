@@ -450,6 +450,40 @@ const verifyMobileOtp = asyncHandler(async (req, res) => {
     res.status(500).send("Failed to verify OTP");
   }
 });
+const verifyEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  try {
+    const existingUser = await User.findOne({ email });
+
+    if (existingUser) {
+      if (existingUser.isBlocked) {
+        return res.status(403).json({ message: "User is blocked" });
+      }
+
+      const token = generateToken(existingUser._id);
+
+      return res.json({
+        message: "Email exists",
+        status: 0,
+        token,
+        userId: existingUser._id,
+      });
+    } else {
+      return res.json({
+        message: "Email not found",
+        status: 1,
+      });
+    }
+  } catch (error) {
+    console.error("Error verifying email:", error);
+    res.status(500).json({ message: "Failed to verify email" });
+  }
+});
 
 const verifyAuthPage = asyncHandler(async (req, res) => {
   const { id, auth_page } = req.body;
@@ -2551,6 +2585,7 @@ module.exports = {
   getAllNotification,
   getMe,
   extendBooking,
+  verifyEmail,
   registerAndAssignRoles,
   getallstaff,
   blockStaff,
