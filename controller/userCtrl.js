@@ -1,5 +1,7 @@
 const User = require("../models/userModel");
-const Booking = require("../models/bookingModel");
+const Booking = require("../models/bookingModel")
+const Location = require("../models/locationModel");
+;
 const asyncHandler = require("express-async-handler");
 const { generateToken } = require("../config/jwtToken");
 const validateMongoDbId = require("../utils/validateMongodbId");
@@ -19,23 +21,16 @@ const registerstaff = require("../models/registerstaff");
 const bcrypt = require("bcryptjs");
 const { register } = require("module");
 const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
+const { Mongoose } = require("mongoose");
+const logoPath = path.join(__dirname, "Logo.png");
+
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
 );
 
-// Create a User
-// const createUser = asyncHandler(async (req, res) => {
-//   const email = req.body.email;
-//   const findUser = await User.findOne({ email: email });
-
-//   if (!findUser) {
-//     const newUser = await User.create(req.body);
-//     res.json(newUser);
-//   } else {
-//     throw new Error("User Already Exists");
-//   }
-// });
 const createUser = asyncHandler(async (req, res) => { 
   const { email, phoneNumber, firstname, lastname } = req.body;
   if (!email || !phoneNumber || !firstname || !lastname) {
@@ -67,71 +62,6 @@ const createUser = asyncHandler(async (req, res) => {
     res.status(500).send("Failed to register user");
   }
 });
-
-// const addRoles = asyncHandler(async (req, res) => {
-//   const { id, role } = req.body;
-
-//   if (!id || !Array.isArray(role)) {
-//     return res.status(400).send("Invalid request body");
-//   }
-
-//   try {
-//     // Find the user by ID and update the auth_page field
-//     const user = await User.findById(id);
-
-//     if (!user) {
-//       return res.status(404).send("User not found");
-//     }
-
-//     // Add new roles to auth_page field
-//     user.auth_page = role
-
-//     // Save the updated user document
-//     await user.save();
-
-//     res.status(200).send("Roles added successfully");
-//   } catch (error) {
-//     res.status(500).send("Server error");
-//   }
-// });
-
-// const addRoles = asyncHandler(async (req, res) => {
-//   const { id, role } = req.body;
-
-//   console.log("Request body:", req.body); // Log the request body
-//   try {
-//     validateMongoDbId(id); // Validate the ID before proceeding
-//   } catch (error) {
-//     console.error("Validation error:", error.message); // Log the validation error
-//     return res.status(400).send(error.message);
-//   }
-
-//   if (!id || !Array.isArray(role)) {
-//     return res.status(400).send("Invalid request body");
-//   }
-
-//   try {
-//     // Find the user by ID and update the auth_page field
-//     const user = await User.findById(id);
-//     console.log("User found:", user); // Log the found user
-
-//     if (!user) {
-//       return res.status(404).send("User not found");
-//     }
-
-//     // Add new roles to auth_page field
-//     user.auth_page = role;
-
-//     // Save the updated user document
-//     await user.save();
-
-//     res.status(200).send("Roles added successfully");
-//   } catch (error) {
-//     console.error("Server error:", error); // Log the server error
-//     res.status(500).send("Server error");
-//   }
-// });
-//new..
 
 const registerAndAssignRoles = asyncHandler(async (req, res) => {
   const { firstname, lastname, email, phoneNumber, password, role, auth_page } =
@@ -175,33 +105,6 @@ const registerAndAssignRoles = asyncHandler(async (req, res) => {
     .send("Staff member registered and roles assigned successfully");
 });
 
-// Login a user
-// const loginUserCtrl = asyncHandler(async (req, res) => {
-//   const { email, password } = req.body;
-
-//   // check if user exists or not
-//   const findUser = await registerstaff.findOne({ email });
-//   if (findUser && (await findUser.isPasswordMatched(password))) {
-//     const refreshToken = await generateRefreshToken(findUser?._id);
-//     await registerstaff.findByIdAndUpdate(findUser._id, { refreshToken });
-//     res.cookie("refreshToken", refreshToken, {
-//       httpOnly: true,
-//       maxAge: 72 * 60 * 60 * 1000,
-//     });
-//     res.json({
-//       _id: findStaff._id,
-//       firstname: findStaff.firstname,
-//       lastname: findStaff.lastname,
-//       email: findStaff.email,
-//       mobile: findStaff.mobile,
-//       role: findStaff.role,
-//       auth_page: findStaff.auth_page,
-//       token: generateToken(findStaff._id),
-//     });
-//   } else {
-//     throw new Error("Invalid Credentials");
-//   }
-// });
 const loginUserCtrl = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
@@ -232,91 +135,6 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
   }
 });
 
-// const loginMobileUserCtrl = asyncHandler(async (req, res) => {
-//   const { phoneNumber, user } = req.body;
-
-//   if (!phoneNumber || !user) {
-//     return res.status(400).send("Phone number and user ID are required");
-//   }
-
-//   // Check if the user ID exists in the User collection
-//   const userExists = await User.findById(user);
-//   if (!userExists) {
-//     return res.status(400).send("Invalid user ID");
-//   }
-
-//   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-//   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
-
-//   try {
-//     let mobileUser = await MobileUserModel.findOne({ phoneNumber });
-//     if (!mobileUser) {
-//       mobileUser = new MobileUserModel({ phoneNumber, user });
-//     } else {
-//       mobileUser.user = user; // Ensure the user field is updated if it already exists
-//     }
-
-//     mobileUser.otp = otp;
-//     mobileUser.otpExpires = otpExpires;
-//     await mobileUser.save();
-
-//     await twilioClient.messages.create({
-//       body: `Your OTP is ${otp}`,
-//       from: process.env.TWILIO_PHONE_NUMBER,
-//       to: phoneNumber,
-//     });
-
-//     res.send("OTP sent successfully");
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).send("Failed to send OTP");
-//   }
-// });
-// const loginMobileUserCtrl = asyncHandler(async (req, res) => {
-//   const { phoneNumber } = req.body;
-//   if (!phoneNumber) {
-//     return res.status(400).send("Phone number is required");
-//   }
-
-//   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-//   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
-
-//   try {
-//     let mobileUser = await MobileUserModel.findOne({ phoneNumber });
-//     if (!mobileUser) {
-//       mobileUser = new MobileUserModel({ phoneNumber });
-//     }
-
-//     mobileUser.otp = otp;
-//     mobileUser.otpExpires = otpExpires;
-//     await mobileUser.save();
-
-//     await twilioClient.messages.create({
-//       body: `Your OTP is ${otp}`,
-//       from: process.env.TWILIO_PHONE_NUMBER,
-//       to: phoneNumber,
-//     });
-
-//     // res.send("OTP sent successfully");
-
-//     const refreshToken = await generateRefreshToken(mobileUser?.user?._id);
-//     const updateuser = await User.findByIdAndUpdate(
-//       mobileUser?.user?.id,
-//       {
-//         refreshToken: refreshToken,
-//       },
-//       { new: true }
-//     );
-//     res.cookie("refreshToken", refreshToken, {
-//       httpOnly: true,
-//       maxAge: 72 * 60 * 60 * 1000,
-//     });
-//     res.json({token: generateToken(mobileUser?.user?._id)})
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).send("Failed to send OTP");
-//   }
-// });
 const loginMobileUserCtrl = asyncHandler(async (req, res) => {
   const { phoneNumber } = req.body;
   if (!phoneNumber) {
@@ -381,33 +199,6 @@ const loginAdmin = asyncHandler(async (req, res) => {
   }
 });
 
-// const verifyMobileOtp = asyncHandler(async (req, res) => {
-//   const { phoneNumber, otp } = req.body;
-//   console.log(phoneNumber, otp, "otp")
-//   if (!phoneNumber || !otp) {
-//     return res.status(400).send("Phone number and OTP are required");
-//   }
-
-//   try {
-//     const user = await MobileUserModel.findOne({ phoneNumber });
-//     if (!user) {
-//       return res.status(400).send("User not found");
-//     }
-
-//     if (user.otp !== otp || new Date() > user.otpExpires) {
-//       return res.status(400).send("Invalid or expired OTP");
-//     }
-
-//     user.otp = null;
-//     user.otpExpires = null;
-//     await user.save();
-
-//     res.send("OTP verified successfully");
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).send("Failed to verify OTP");
-//   }
-// });
 const verifyMobileOtp = asyncHandler(async (req, res) => {
   const { phoneNumber, otp } = req.body;
   if (!phoneNumber || !otp) {
@@ -684,56 +475,6 @@ const unblockStaff = asyncHandler(async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// const editStaff = asyncHandler(async (req, res) => {
-//   const { id } = req.params;
-//   const {
-//     firstname,
-//     lastname,
-//     email,
-//     mobile,
-//     password,
-//     role,
-//     auth_page,
-//     isBlocked,
-//   } = req.body;
-
-//   validateMongoDbId(id);
-
-//   try {
-//     const updatedData = {
-//       firstname,
-//       lastname,
-//       email,
-//       mobile,
-//       role,
-//       auth_page,
-//       isBlocked,
-//     };
-
-//     // If password is provided, hash it before saving
-//     if (password) {
-//       const salt = await bcrypt.genSaltSync(10);
-//       updatedData.password = await bcrypt.hash(password, salt);
-//     }
-
-//     const updatedStaff = await registerstaff.findByIdAndUpdate(
-//       id,
-//       updatedData,
-//       {
-//         new: true,
-//         runValidators: true,
-//       }
-//     );
-
-//     if (!updatedStaff) {
-//       return res.status(404).json({ message: "Staff member not found" });
-//     }
-
-//     res.json({ message: "Staff member updated successfully", updatedStaff });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// });
 
 const editStaff = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -1009,133 +750,6 @@ function get_slot_index_from_time(time_obj, start_time) {
   console.log("Index: ", (hours - start_time) * 4 + Math.floor(minutes / 15));
   return (hours - start_time) * 4 + Math.floor(minutes / 15);
 }
-
-// Create a booking for a user with podId, timeSlot and status as pending by default
-// const createBooking = asyncHandler(async (req, res) => {
-//   const { _id } = req.user;
-//   const { podId } = req.params;
-//   validateMongoDbId(_id);
-//   validateMongoDbId(podId);
-//   try {
-//     const { bookingDate, startTime, endTime, timeSlotNumber, bookingPurpose, description } = req.body;
-
-//     const user = await User.findById(_id);
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     // Convert bookingDate, startTime, and endTime to Date objects in IST
-
-//     // Check for overlapping bookings
-//     const existingBooking = await Booking.findOne({
-//       podId,
-//       status: { $ne: 'Cancelled' },
-//       $or: [
-//         {
-//           $and: [
-//             { startTime: { $lte: startTimeObj } },
-//             { endTime: { $gte: endTimeObj } },
-//           ],
-//         }, // Check if new booking starts during existing booking
-//         {
-//           $and: [
-//             { startTime: { $lte: endTimeObj } },
-//             { endTime: { $gte: endTimeObj } },
-//           ],
-//         }, // Check if new booking ends during existing booking
-//         {
-//           $and: [
-//             { startTime: { $gte: startTimeObj } },
-//             { endTime: { $lte: endTimeObj } },
-//           ],
-//         }, // Check if new booking is completely within existing booking
-//       ],
-//     });
-//     if (existingBooking) {
-//       return res.status(400).json({ message: "Booking with the same date and time already exists" });
-//     }
-
-//     // Generate QR Code Data String
-//     const startTimeStamp = Math.floor(startTimeObj.getTime() / 1000);
-//     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000);
-
-//     // // Calculate IST Unix timestamps by adding the offset (19800 seconds)
-//     // const IST_OFFSET_SECONDS = 19800; // 5 hours and 30 minutes in seconds
-//     // const startTimeIST = startTimeStamp + IST_OFFSET_SECONDS;
-//     // const endTimeIST = endTimeStamp + IST_OFFSET_SECONDS;
-//     const qrCodeDataString = `F2/${process.env.DEVICE_ID}/${process.env.USER_ID}/0/${endTimeStamp}/${startTimeStamp}`;
-
-//     // Create new booking
-//     const newBooking = await Booking.create({
-//       user: user._id,
-//       podId,
-//       bookingDate: bookingDateObj,
-//       startTime: startTimeObj,
-//       endTime: endTimeObj,
-//       timeSlotNumber,
-//       bookingPurpose,
-//       description: description || null ,
-//       status: "Pending",
-//       qrCodeData: qrCodeDataString,
-//       feedback: {
-//         message:null,
-//         rating: null,
-//       }
-//     });
-
-//     user.booking.push(newBooking._id);
-//     await user.save();
-
-//     // Create or update product availability entry
-//     const productAvailability = await ProductAvailability.findOne({
-//       product_id: podId,
-//       booking_date: {
-//         $gte: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate()),
-//         $lt: new Date(bookingDateObj.getFullYear(), bookingDateObj.getMonth(), bookingDateObj.getDate() + 1)
-//       }
-//     });
-
-//     if (productAvailability) {
-//       // Update slot bookings
-//       let updatedSlotBookings = productAvailability.slot_bookings;
-//       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
-//       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
-//       for (let i = startingIndex; i < endingIndex; i++) {
-//         updatedSlotBookings[i] = true;
-//       }
-
-//       await ProductAvailability.findOneAndUpdate({_id:productAvailability._id}, {slot_bookings: updatedSlotBookings}, { new: true });
-//     } else {
-//       // Create new product availability entry
-//       const indexes = (END_TIME - START_TIME) * 4;
-//       const slotBookings = Array.from({ length: indexes }, () => false);
-//       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
-//       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
-
-//       for (let i = startingIndex; i < endingIndex; i++) {
-//         slotBookings[i] = true;
-//       }
-
-//       const data = {
-//         product_id: podId,
-//         slot_bookings: slotBookings,
-//         booking_date: bookingDateObj,
-//       };
-//       await ProductAvailability.create(data);
-//     }
-
-//     // Convert the new booking times to IST for the response
-//     const responseBooking = {
-//       ...newBooking._doc,
-//     };
-
-//     sendNotificationOnBooking(user, newBooking);
-//     res.status(201).json({ message: "Booking created successfully", booking: responseBooking });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "Internal server error" });
-//   }
-// });
 const createBooking = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   const { podId } = req.params;
@@ -1518,31 +1132,10 @@ const extendBooking = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
-// get all bookings for a user
-// const getBookingsByUser = asyncHandler(async (req, res) => {
-//   const { _id } = req.user;
-//   validateMongoDbId(_id);
-//   try {
-//     const user = await User.findById(_id).populate("booking");
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-//     const bookings = user.booking;
-//     res.json(bookings);
-//   } catch (error) {
-//     console.error("Error fetching bookings by user:", error); // Log the error for debugging
-//     res.status(500).json({
-//       status: "fail",
-//       message: "An error occurred while fetching bookings by user.",
-//     });
-//   }
-// });
 const getBookingsByUser = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
   try {
-    // Call updateBookingStatusAutomatically function
     await updateBookingStatusAutomatically(req, res, async () => {});
 
     const user = await User.findById(_id).populate("booking");
@@ -1561,9 +1154,11 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
   }
 });
 
-// Get all bookings for admin to manage and update status of booking as per the status
+
 // const getBookings = asyncHandler(async (req, res) => {
 //   try {
+//     await updateBookingStatusAutomatically(req, res, async () => {});
+
 //     const allBookings = await Booking.find();
 //     res.json(allBookings);
 //   } catch (error) {
@@ -1571,15 +1166,74 @@ const getBookingsByUser = asyncHandler(async (req, res) => {
 //   }
 // });
 
+// const getBookings = asyncHandler(async (req, res) => {
+//   try {
+//     await updateBookingStatusAutomatically(req, res, async () => {});
+
+//     // Get all bookings
+//     const allBookings = await Booking.find();
+
+//     // Loop through all bookings to populate user and location details
+//     const bookingsWithDetails = await Promise.all(
+//       allBookings.map(async (booking) => {
+//         const user = await User.findById(booking.user);
+//         const username = user ? user.firstname + ""+ user.lastname : "Unknown";
+
+//         const location = await productModel.findById(booking.podId);
+//         console.log("location", location);
+//         const locationName = location ? location.location : "Unknown";
+
+//         // Return the booking with user and location details
+//         return {
+//           ...booking.toObject(),
+//           username,
+//           locationName,
+//         };
+//       })
+//     );
+
+//     res.json(bookingsWithDetails);
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
 const getBookings = asyncHandler(async (req, res) => {
   try {
-    // Call updateBookingStatusAutomatically function
     await updateBookingStatusAutomatically(req, res, async () => {});
 
     const allBookings = await Booking.find();
-    res.json(allBookings);
+
+    const bookingsWithDetails = await Promise.all(
+      allBookings.map(async (booking) => {
+        const user = await User.findById(booking.user);
+        const username = user
+          ? `${user.firstname} ${user.lastname}`
+          : "Unknown";
+
+        const pod = await productModel.findById(booking.podId);
+        let locationName = "Unknown";
+        let locationDetails = null;
+
+        if (pod && pod.location) {
+          // ✅ Assuming you have a Location model imported
+          const Location = require("../models/locationModel"); // adjust path as needed
+          locationDetails = await Location.findById(pod.location);
+          locationName = locationDetails?.name || "Unknown";
+        }
+
+        return {
+          ...booking.toObject(),
+          username,
+          locationName,
+          locationDetails, // you can return full location object if needed
+        };
+      })
+    );
+
+    res.json(bookingsWithDetails);
   } catch (error) {
-    throw new Error(error);
+    console.error(error);
+    throw new Error(error.message);
   }
 });
 
@@ -1629,7 +1283,182 @@ const getBookingById = asyncHandler(async (req, res) => {
 // };
 
 
-const generateInvoicePdfBuffer = (booking, user) => {
+// const generateInvoicePdfBuffer = (booking, user) => {
+//   return new Promise((resolve, reject) => {
+//     const doc = new PDFDocument({ margin: 50 });
+//     const buffers = [];
+
+//     doc.on("data", buffers.push.bind(buffers));
+//     doc.on("end", () => {
+//       const pdfData = Buffer.concat(buffers);
+//       resolve(pdfData);
+//     });
+
+//     // COMPANY HEADER
+//     doc.fontSize(16).text("Privily (Pty) Ltd", { align: "left" });
+//     doc.fontSize(10).text("Reg. No.: 2023/832609/07");
+//     doc.text("9 Mt. Orville, Midlands Estate, Midstream");
+//     doc.text("Vat No.: 4890315445");
+//     doc.text("Ph: (+27) 082 4412152 / (+27) 083 212 8647");
+//     doc.moveDown();
+
+//     // INVOICE METADATA
+//     doc.fontSize(14).text(`Tax Invoice # ${booking.invoiceNumber || "XXXX"}`, {
+//       align: "right",
+//     });
+//     doc.fontSize(10).text(`Invoice Date: ${new Date().toLocaleDateString()}`, {
+//       align: "right",
+//     });
+//     doc.text(
+//       `Due Date: ${
+//         booking.dueDate?.toLocaleDateString() || "10 days from invoice"
+//       }`,
+//       { align: "right" }
+//     );
+//     doc.text(`Invoice No.: ${booking.invoiceNumber || "0001"}`, {
+//       align: "right",
+//     });
+
+//     doc.moveDown();
+
+//     // BILL TO
+//     doc.fontSize(12).text("BILL TO:", { underline: true });
+//     doc.text(`${user.firstname} ${user.lastname}`);
+//     doc.text(user.email);
+//     if (user.company) doc.text(user.company);
+//     if (user.vatNumber) doc.text(`VAT No.: ${user.vatNumber}`);
+//     doc.moveDown();
+
+//     // TABLE HEADER
+//     doc.font("Helvetica-Bold");
+//     doc.text("DESCRIPTION", 50, doc.y, { continued: true });
+//     doc.text("UNIT", 250, doc.y, { continued: true });
+//     doc.text("QTY", 300, doc.y, { continued: true });
+//     doc.text("DURATION", 350, doc.y, { continued: true });
+//     doc.text("RATE", 420, doc.y, { continued: true });
+//     doc.text("TOTAL", 480, doc.y);
+//     doc.moveDown();
+//     doc.font("Helvetica");
+//     if (Array.isArray(booking.items) && booking.items.length > 0) {
+//       booking.items.forEach((item) => {
+//         doc.text(item.description, 50, doc.y, { continued: true });
+//         doc.text(item.unit, 250, doc.y, { continued: true });
+//         doc.text(item.qty.toString(), 300, doc.y, { continued: true });
+//         doc.text(item.duration, 350, doc.y, { continued: true });
+//         doc.text(`R ${item.rate.toLocaleString()}`, 420, doc.y, {
+//           continued: true,
+//         });
+//         doc.text(`R ${item.total.toLocaleString()}`, 480, doc.y);
+//         doc.moveDown();
+//       });
+//     } else {
+//       console.log("No items available in the booking.");
+//       doc.text("No items available.", 50, doc.y);
+//     }
+//     doc.moveDown();
+//     const subtotal = booking.subtotal || 24000;
+//     const vat = booking.vat || subtotal * 0.15;
+//     const total = subtotal + vat;
+
+//     doc.font("Helvetica-Bold");
+//     doc.text(`SUBTOTAL`, 420, doc.y, { continued: true });
+//     doc.text(`R ${subtotal.toLocaleString()}`, 480, doc.y);
+//     doc.text(`VAT`, 420, doc.y, { continued: true });
+//     doc.text(`R ${vat.toLocaleString()}`, 480, doc.y);
+//     doc.text(`TOTAL`, 420, doc.y, { continued: true });
+//     doc.text(`R ${total.toLocaleString()}`, 480, doc.y);
+//     doc.font("Helvetica");
+
+//     doc.moveDown();
+
+//     // BANK DETAILS
+//     doc.fontSize(10);
+//     doc.text("Bank Details:");
+//     doc.text("Privily (Pty) Ltd");
+//     doc.text("Standard Bank, Branch: 002645");
+//     doc.text("Account: 10 20 085 0707");
+//     doc.text("SWIFT: SBZAZAJJ");
+
+//     doc.moveDown();
+//     doc.text(
+//       `Event: Fame Week Africa - Soundproof Pods - ${
+//         booking.eventStartDate || "02 Sept 2024"
+//       } to ${booking.eventEndDate || "04 Sept 2024"}`
+//     );
+
+//     doc.end();
+//   });
+// };
+const drawTable = (doc, booking, duration, rate, bookingTotal) => {
+  const tableTop = doc.y;
+  const rowHeight = 20;
+  const columnWidths = [240, 50, 50, 70, 70, 70];
+  const tableWidth = columnWidths.reduce((acc, width) => acc + width, 0);
+  const cellPadding = 5;
+
+  doc
+    .font("Helvetica-Bold")
+    .text("DESCRIPTION", 50 + cellPadding, tableTop, {
+      width: columnWidths[0] - cellPadding,
+      align: "left",
+    })
+    .text("DURATION", 400, tableTop, {
+      width: columnWidths[3],
+      align: "center",
+    })
+    .text("RATE", 470, tableTop, { width: columnWidths[4], align: "center" })
+    .text("TOTAL", 540, tableTop, { width: columnWidths[5], align: "center" });
+
+  // Header row border
+  doc.rect(50, tableTop - 5, tableWidth, rowHeight).stroke();
+
+  const rowTop = tableTop + rowHeight;
+
+  doc
+    .font("Helvetica")
+    .text(booking.podTitle, 50 + cellPadding, rowTop, {
+      width: columnWidths[0] - cellPadding,
+      align: "left",
+    })
+
+    .text(`R ${rate.toLocaleString()}`, 470, rowTop, {
+      width: columnWidths[4],
+      align: "center",
+    })
+    .text(duration, 400, rowTop, {
+      width: columnWidths[3],
+      align: "center",
+    })
+    .text(`R ${bookingTotal.toLocaleString()}`, 540, rowTop, {
+      width: columnWidths[5],
+      align: "center",
+    });
+
+  // Row border
+  doc.rect(50, rowTop - 5, tableWidth, rowHeight).stroke();
+
+  return rowTop + rowHeight;
+};
+
+
+const generateInvoicePdfBuffer = async (booking, user) => {
+  console.log("booking",booking)
+const pod = await productModel.findById(booking.podId);
+console.log("pod",pod)
+const rate = pod?.rate;
+console.log("rate", rate);
+
+const startTime = new Date(booking.startTime);
+const endTime = new Date(booking.endTime);
+
+console.log("pods", startTime,endTime);
+
+
+const durationInMinutes = Math.round((endTime - startTime) / (1000 * 60)); // 1 min = 60,000 ms
+const duration = `${durationInMinutes}`;
+const bookingTotal = durationInMinutes * rate;
+console.log("duration", duration, rate, bookingTotal);
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50 });
     const buffers = [];
@@ -1641,100 +1470,93 @@ const generateInvoicePdfBuffer = (booking, user) => {
     });
 
     // COMPANY HEADER
-    doc.fontSize(16).text("Privily (Pty) Ltd", { align: "left" });
-    doc.fontSize(10).text("Reg. No.: 2023/832609/07");
-    doc.text("9 Mt. Orville, Midlands Estate, Midstream");
-    doc.text("Vat No.: 4890315445");
-    doc.text("Ph: (+27) 082 4412152 / (+27) 083 212 8647");
+    doc.image(logoPath, 50, 50, { width: 200 });
+    doc.fontSize(16).text("Privily (Pty) Ltd", { align: "right" });
+    doc.fontSize(10).text("Reg. No.: 2023/832609/07", { align: "right" });
+    doc.text("9 Mt. Orville, Midlands Estate, Midstream", { align: "right" });
+    doc.text("Vat No.: 4890315445", { align: "right" });
+    doc.text("Ph: (+27) 082 4412152 / (+27) 083 212 8647", { align: "right" });
     doc.moveDown();
 
     // INVOICE METADATA
-    doc.fontSize(14).text(`Tax Invoice # ${booking.invoiceNumber || "XXXX"}`, {
-      align: "right",
-    });
-    doc.fontSize(10).text(`Invoice Date: ${new Date().toLocaleDateString()}`, {
-      align: "right",
-    });
-    doc.text(
-      `Due Date: ${
-        booking.dueDate?.toLocaleDateString() || "10 days from invoice"
-      }`,
-      { align: "right" }
-    );
-    doc.text(`Invoice No.: ${booking.invoiceNumber || "0001"}`, {
-      align: "right",
+    doc.fontSize(14).text(`Tax Invoice`, {
+      align: "center",
     });
 
     doc.moveDown();
 
     // BILL TO
     doc.fontSize(12).text("BILL TO:", { underline: true });
-    doc.text(`${user.firstname} ${user.lastname}`);
-    doc.text(user.email);
+    doc.text(`${booking.user.firstname} ${booking.user.lastname}`);
+    doc.text(booking.user.email);
     if (user.company) doc.text(user.company);
     if (user.vatNumber) doc.text(`VAT No.: ${user.vatNumber}`);
+    doc.fontSize(10).text(`Invoice Date: ${new Date().toLocaleDateString()}`, {
+      align: "right",
+    });
+    doc.text(`Invoice No.: ${booking.invoiceNumber || "0001"}`, {
+      align: "right",
+    });
     doc.moveDown();
 
-    // TABLE HEADER
-    doc.font("Helvetica-Bold");
-    doc.text("DESCRIPTION", 50, doc.y, { continued: true });
-    doc.text("UNIT", 250, doc.y, { continued: true });
-    doc.text("QTY", 300, doc.y, { continued: true });
-    doc.text("DURATION", 350, doc.y, { continued: true });
-    doc.text("RATE", 420, doc.y, { continued: true });
-    doc.text("TOTAL", 480, doc.y);
-    doc.moveDown();
-    doc.font("Helvetica");
-    if (Array.isArray(booking.items) && booking.items.length > 0) {
-      booking.items.forEach((item) => {
-        doc.text(item.description, 50, doc.y, { continued: true });
-        doc.text(item.unit, 250, doc.y, { continued: true });
-        doc.text(item.qty.toString(), 300, doc.y, { continued: true });
-        doc.text(item.duration, 350, doc.y, { continued: true });
-        doc.text(`R ${item.rate.toLocaleString()}`, 420, doc.y, {
-          continued: true,
-        });
-        doc.text(`R ${item.total.toLocaleString()}`, 480, doc.y);
-        doc.moveDown();
+    // Draw the table with the items
+    const tableHeight = drawTable(doc, booking, rate, duration, bookingTotal);
+
+    // Subtotal, VAT, and Total
+const subtotal = bookingTotal;
+const vat = subtotal * 0.15;
+const grandTotal = subtotal;
+
+    const columnWidths = [240, 50, 50, 70, 70, 70];
+    const tableStartX = 50;
+    const totalColumnX =
+      tableStartX + columnWidths.slice(0, 5).reduce((sum, w) => sum + w, 0);
+
+    const totalColumnWidth = columnWidths[5]; // 70
+    const labelX = totalColumnX - 80;
+    const valueX = totalColumnX;
+
+    // Subtotal
+      doc.text("VAT", labelX, tableHeight + 40);
+      doc.text(`R ${vat.toLocaleString()}`, valueX, tableHeight + 40, {
+        width: totalColumnWidth,
+        align: "left",
       });
-    } else {
-      console.log("No items available in the booking.");
-      doc.text("No items available.", 50, doc.y);
-    }
-    doc.moveDown();
-    const subtotal = booking.subtotal || 24000;
-    const vat = booking.vat || subtotal * 0.15;
-    const total = subtotal + vat;
+    // Total
+    doc.text("TOTAL", labelX, tableHeight + 60);
+    doc.text(`R ${grandTotal.toLocaleString()}`, valueX, tableHeight + 60, {
+      width: totalColumnWidth,
+      align: "left",
+    });
 
-    doc.font("Helvetica-Bold");
-    doc.text(`SUBTOTAL`, 420, doc.y, { continued: true });
-    doc.text(`R ${subtotal.toLocaleString()}`, 480, doc.y);
-    doc.text(`VAT`, 420, doc.y, { continued: true });
-    doc.text(`R ${vat.toLocaleString()}`, 480, doc.y);
-    doc.text(`TOTAL`, 420, doc.y, { continued: true });
-    doc.text(`R ${total.toLocaleString()}`, 480, doc.y);
     doc.font("Helvetica");
 
     doc.moveDown();
 
     // BANK DETAILS
     doc.fontSize(10);
-    doc.text("Bank Details:");
-    doc.text("Privily (Pty) Ltd");
-    doc.text("Standard Bank, Branch: 002645");
-    doc.text("Account: 10 20 085 0707");
-    doc.text("SWIFT: SBZAZAJJ");
+    doc.text("Bank Details:", 50, doc.y, { align: "left" });
+    doc.text("Privily (Pty) Ltd", 50, doc.y, { align: "left" });
+    doc.text("Standard Bank, Branch: 002645", 50, doc.y + 10, {
+      align: "left",
+    });
+    doc.text("Account: 10 20 085 0707", 50, doc.y, { align: "left" });
+    doc.text("SWIFT: SBZAZAJJ", 50, doc.y, { align: "left" });
 
+    // Add space after the bank details
     doc.moveDown();
-    doc.text(
-      `Event: Fame Week Africa - Soundproof Pods - ${
-        booking.eventStartDate || "02 Sept 2024"
-      } to ${booking.eventEndDate || "04 Sept 2024"}`
-    );
+
+    // doc.text(
+    //   `Event: Fame Week Africa - Soundproof Pods - ${
+    //     booking.eventStartDate || "02 Sept 2024"
+    //   } to ${booking.eventEndDate || "04 Sept 2024"}`
+    // );
 
     doc.end();
   });
 };
+
+// Sample booking and user objects to test the function
 
 
 const sendInvoiceEmailWithAttachment = async (booking, user) => {
@@ -1765,6 +1587,7 @@ const sendInvoiceEmail = asyncHandler(async (req, res) => {
   validateMongoDbId(bookingId);
 
   const booking = await Booking.findById(bookingId).populate("user");
+
   if (!booking) {
     return res.status(404).json({ message: "Booking not found" });
   }
@@ -1779,30 +1602,6 @@ const sendInvoiceEmail = asyncHandler(async (req, res) => {
   res.json({ message: "Invoice PDF sent successfully" });
 });
 
-
-// const sendInvoiceEmail = asyncHandler(async (req, res) => {
-//   const { bookingId } = req.params;
-//   validateMongoDbId(bookingId);
-
-//   const booking = await Booking.findById(bookingId).populate('user');
-//   if (!booking) {
-//     return res.status(404).json({ message: 'Booking not found' });
-//   }
-
-//   const user = booking.user;
-//   if (!user) {
-//     return res.status(404).json({ message: 'User not found' });
-//   }
-
-//   // Compose invoice email html (you can reuse your invoice generator)
-//   const invoiceHtml = generateInvoiceHtml(booking, user);
-
-//   await sendEmail(user.email, 'Your Booking Invoice - Privily', invoiceHtml);
-
-//   res.json({ message: 'Invoice email sent successfully' });
-// });
-
-// update booking by id
 const updateBookingById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
@@ -2071,148 +1870,6 @@ const sendNotificationOnCancel = asyncHandler(async (userId, bookingId) => {
     throw new Error("Failed to send cancellation notification");
   }
 });
-
-//update booking auromatically when current time is equal to or greater than booking start time
-// const updateBookingStatusAutomatically = asyncHandler(async (req, res) => {
-//   const { _id } = req.user;
-//   validateMongoDbId(_id);
-
-//   try {
-//     const now = new Date();
-
-//     console.log("Current Time:", now);
-
-//     // Find pending bookings
-//     const pendingBookings = await Booking.find({
-//       user: _id,
-//       isBookingActive: true,
-//       status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] }, // Use $nin operator to exclude multiple statuses
-//       endTime: { $lte: now }, // Find bookings where endTime is less than or equal to now
-//     }).populate("user");
-
-//     // console.log("Pending Bookings:", pendingBookings);
-//     // Update completed bookings status to "Completed"
-//     const updatedCompletedBookings = await Promise.all(
-//       pendingBookings.map(async (booking) => {
-//         console.log(booking.startTime);
-//         console.log(booking.endTime);
-
-//         if (booking.endTime <= now) {
-//           // Use endTime directly for comparison
-//           booking.status = "Completed";
-//         }
-//         if (booking.startTime <= now && now <= booking.endTime) {
-//           // Check if now is within booking's start and end time
-//           booking.status = "Processing";
-//         }
-//         return await booking.save();
-//       })
-//     );
-
-//     // Send the response
-//     res.json({
-//       message: "Booking status updated successfully",
-//       updatedCompletedBookings,
-//     });
-//   } catch (error) {
-//     console.error("Error updating booking status:", error);
-//     res.status(500).json({ message: "Failed to update booking status" });
-//   }
-// });
-// const updateBookingStatusAutomatically = async (req, res, next) => {
-//   const { _id } = req.user;
-//   validateMongoDbId(_id);
-
-//   try {
-//     const now = new Date();
-
-//     console.log("Current Time:", now);
-
-//     // Find all active bookings
-//     const bookings = await Booking.find({
-//       user: _id,
-//       isBookingActive: true,
-//       status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] },
-//     }).populate("user");
-
-//     // Update booking statuses
-//     const updatedBookings = await Promise.all(
-//       bookings.map(async (booking) => {
-//         if (booking.startTime <= now && now < booking.endTime) {
-//           // Check if now is within booking's start and end time
-//           booking.status = "Processing";
-//         } else if (now >= booking.endTime) {
-//           // Check if now is past the booking's end time
-//           booking.status = "Completed";
-//           booking.isBookingActive = false; // Mark booking as inactive
-//         }
-//         return await booking.save();
-//       })
-//     );
-
-//     if (next) {
-//       next();
-//     } else {
-//       // Send the response
-//       res.json({
-//         message: "Booking status updated successfully",
-//         updatedBookings,
-//       });
-//     }
-//   } catch (error) {
-//     console.error("Error updating booking status:", error);
-//     if (next) {
-//       next(error);
-//     } else {
-//       res.status(500).json({ message: "Failed to update booking status" });
-//     }
-//   }
-// };
-
-// const updateBookingStatusAutomatically = async (req, res, next) => {
-//   const { _id } = req.user;
-//   validateMongoDbId(_id);
-
-//   try {
-//     const now = new Date();
-
-//     // Find all active bookings
-//     const bookings = await Booking.find({
-//       user: _id,
-//       isBookingActive: true,
-//       status: { $in: ["Pending", "Processing"], $nin: ["Rated", "Cancelled"] },
-//     }).populate("user");
-
-//     // Update booking statuses
-//     const updatedBookings = await Promise.all(
-//       bookings.map(async (booking) => {
-//         if (booking.startTime <= now && now < booking.endTime) {
-//           booking.status = "Processing";
-//         } else if (now >= booking.endTime) {
-//           booking.status = "Completed";
-//           booking.isBookingActive = false;
-//         }
-//         return await booking.save();
-//       })
-//     );
-
-//     if (next) {
-//       next();
-//     } else {
-//       res.json({
-//         message: "Booking status updated successfully",
-//         updatedBookings,
-//       });
-//     }
-//   } catch (error) {
-//     console.error("Error updating booking status:", error);
-//     if (next) {
-//       next(error);
-//     } else {
-//       res.status(500).json({ message: "Failed to update booking status" });
-//     }
-//   }
-// };
 const updateBookingStatusAutomatically = async (req, res, next) => {
   const { _id } = req.user;
   validateMongoDbId(_id);
@@ -2234,8 +1891,6 @@ const updateBookingStatusAutomatically = async (req, res, next) => {
     // Update booking statuses
     const updatedBookings = await Promise.all(
       bookings.map(async (booking) => {
-        console.log("bookingsimp", bookings.startTime <= updatedTime);
-        console.log("bookingsimp11", booking);
         if (
           booking.startTime.isBefore(updatedTime) &&
           updatedTime.isBefore(booking.endTime)
@@ -2434,7 +2089,8 @@ const rateBooking = async (req, res) => {
 
     // Find the corresponding product by product ID
     const product = await productModel.findById(productId);
-
+console.log("product",product);
+console.log("product.rate",product.ratings);
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -2459,8 +2115,124 @@ const rateBooking = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+// const getAllRatings = async (req, res) => {
+//   try {
+   
 
-// Update booking status as per the status provided by admin to manage booking status
+//     const ratedProducts = await productModel.find(
+//       { "ratings.0": { $exists: true } },
+//       { name: 1, ratings: 1 }
+//     );
+
+//     res.status(200).json({
+//       message: "All ratings from bookings and products retrieved",
+//       products: ratedProducts,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
+
+
+
+
+// const getAllRatings = async (req, res) => {
+//   try {
+//     // Fetch all the products with ratings, and populate the fields such as location and category
+//     const ratedProducts = await productModel
+//       .find(
+//         { "ratings.0": { $exists: true } }, // only products with ratings
+//         { ratings: 1, title: 1, location: 1, category: 1 } // retrieving specific fields
+//       )
+//       .populate("location", "name direction") // Assuming Location model has fields like name and direction
+//       .populate("category", "name") // Assuming PCategory model has a 'name' field
+//   .populate('ratings.postedby', 'name email')
+//     res.status(200).json({
+//       message: "All ratings from bookings and products retrieved",
+//       products: ratedProducts,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
+
+
+// const getAllRatings = async (req, res) => {
+//   try {
+//     // Fetch all the products with ratings and populate user details (postedby)
+//     const ratedProducts = await productModel
+//       .find(
+//         { "ratings.0": { $exists: true } }, // only products with ratings
+//         { ratings: 1, title: 1, location: 1, category: 1 } // retrieve specific fields
+//       )
+//       .populate("location", "name direction") // Populate Location model
+//       .populate("category", "name") // Populate PCategory model
+//       .populate("ratings.postedby", "firstname email"); // Populate User details for the rating's postedby field
+
+// console.log(ratedProducts);
+//     res.status(200).json({
+//       message: "All ratings from bookings and products retrieved",
+//       products: ratedProducts,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
+
+
+// const getAllRatings = async (req, res) => {
+//   try {
+//     const ratedBookings = await Booking.find(
+//       { status: "Rated", feedback: { $exists: true } },
+//       { feedback: 1, _id: 1, userId: 1 }
+//     );
+
+//     const ratedProducts = await productModel.find(
+//       { "ratings.0": { $exists: true } },
+//       { name: 1, ratings: 1 }
+//     );
+
+//     res.status(200).json({
+//       message: "All ratings from bookings and products retrieved",
+//       bookings: ratedBookings,
+//       products: ratedProducts,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
+const getAllRatings = async (req, res) => {
+  try {
+    const ratedBookings = await Booking.find(
+      { status: "Rated", feedback: { $exists: true } },
+      { feedback: 1, _id: 1, userId: 1, createdAt:1 }
+    ).populate("user", "firstname lastname email"); // Populate user details from userId in Booking
+
+    const ratedProducts = await productModel
+      .find(
+        { "ratings.0": { $exists: true } },
+        { name: 1, ratings: 1, location: 1, title: 1 }
+      )
+      .populate("location", "name direction"); // Populate location details from location in Product
+
+    const result = {
+      bookings: ratedBookings,
+      products: ratedProducts,
+    };
+
+    res.status(200).json({
+      message: "All ratings from bookings and products retrieved",
+      result,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 const updateBookingStatusByAdmin = asyncHandler(async (req, res) => {
   const { status } = req.body;
   const { id } = req.params;
@@ -2567,6 +2339,7 @@ module.exports = {
   resetPassword,
   loginAdmin,
   saveAddress,
+  getAllRatings,
   // applyCoupon,
   createBooking,
   getBookings,

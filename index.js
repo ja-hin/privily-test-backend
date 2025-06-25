@@ -33,6 +33,8 @@ app.use("/api/category", categoryRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/api/pages", pageRouter)
 app.use("/api/location", locationRouter);
+app.use("/api/rating", locationRouter);
+
 app.use("/api/dashboard", dashBoardRoute);
 app.use("/api", uploadRouter);
 app.use("/api/payments", Paymentrouter);

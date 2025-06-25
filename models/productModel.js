@@ -12,9 +12,9 @@ var productSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    rate:{
-      type:Number,
-      required: true
+    rate: {
+      type: Number,
+      required: true,
     },
     slug: {
       type: String,
@@ -90,6 +90,7 @@ var productSchema = new mongoose.Schema(
         star: Number,
         comment: String,
         postedby: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        createdAt: { type: Date, default: Date.now },
       },
     ],
     UserId: {
@@ -108,10 +109,10 @@ var productSchema = new mongoose.Schema(
       type: String,
       default: 0,
     },
-email:{
-      type:String,
-      required:true
-    }
+    email: {
+      type: String,
+      required: true,
+    },
   },
   { timestamps: true }
 );

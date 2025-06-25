@@ -10,6 +10,12 @@ var locationSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  booking: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Booking",
+        },
+      ],
   Street: {
     type: String,
     required: true,

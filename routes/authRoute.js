@@ -47,6 +47,7 @@ const {
   sendInvoiceEmail,
   getUserByID,
   verifyEmail,
+  getAllRatings,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -119,7 +120,7 @@ router.put(
 );
 
 router.put("/rate/:bookingId/:productId", rateBooking);
-
+router.get("/ratings/all", getAllRatings);
 router.get("/notifications/active", authMiddleware, getAllNotification);
 router.put("/notification/send", authMiddleware, sendNotification);
 
