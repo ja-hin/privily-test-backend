@@ -2209,7 +2209,7 @@ const getAllRatings = async (req, res) => {
   try {
     const ratedBookings = await Booking.find(
       { status: "Rated", feedback: { $exists: true } },
-      { feedback: 1, _id: 1, userId: 1, createdAt:1 }
+      { feedback: 1, _id: 1, userId: 1, bookingDate: 1, startTime: 1, endTime:1 }
     ).populate("user", "firstname lastname email"); // Populate user details from userId in Booking
 
     const ratedProducts = await productModel
