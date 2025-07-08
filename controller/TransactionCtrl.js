@@ -1,7 +1,10 @@
 const discountModel = require("../models/discountModel");
 const RateModel = require("../models/rateModel");
+const Booking = require("../models/bookingModel");
 const Transaction = require("../models/Transaction");
 const asyncHandler = require("express-async-handler");
+const User = require("../models/userModel");
+const productModel = require("../models/productModel");
 
 const saveTransaction = async (req, res) => {
   try {
@@ -26,19 +29,113 @@ const saveTransaction = async (req, res) => {
     res.status(500).json({ message: "Failed to save transaction" });
   }
 };
-const getAllTransactions = async (req, res) => {
+// const getAllTransactions = async (req, res) => {
+//   try {
+//     const transactions = await Transaction.find();
+//     res.status(200).json({
+//       status: 200,
+//       message: "API successfully fetched the data",
+//       data: transactions,
+//     });
+//   } catch (error) {
+//     console.error("Error retrieving transactions:", error);
+//     res.status(500).json({ message: "Failed to retrieve transactions" });
+//   }
+// };
+// const getAllTransactions = async (req, res) => {
+//   try {
+//     // Fetch all transactions
+//     const transactions = await Transaction.find();
+
+//     // Create an array to hold the enhanced transaction data
+//     const enhancedTransactions = [];
+
+//     // Loop through each transaction and find the matching booking
+//     for (const transaction of transactions) {
+//       const booking = await Booking.findOne({
+//         createdAt: { $gte: new Date(transaction.createdAt) },
+//       });
+// console.log("booking",booking)
+//       if (booking) {
+//         const enhancedTransaction = {
+//           ...transaction.toObject(), // Convert mongoose object to plain JS object
+//           podName: booking.podTitle, // Add podTitle from Booking model
+//           location: booking.location, // Add location from Booking model
+//           username: booking.user, // Add userName from Booking model
+//         };
+//         enhancedTransactions.push(enhancedTransaction);
+//       } else {
+//         enhancedTransactions.push(transaction);
+//       }
+//     }
+
+//     res.status(200).json({
+//       status: 200,
+//       message: "API successfully fetched the data",
+//       data: enhancedTransactions,
+//     });
+//   } catch (error) {
+//     console.error("Error retrieving transactions:", error);
+//     res.status(500).json({ message: "Failed to retrieve transactions" });
+//   }
+// };
+
+
+const getAllTransactions = asyncHandler(async (req, res) => {
   try {
+    // Fetch all transactions
     const transactions = await Transaction.find();
+
+    const enhancedTransactions = await Promise.all(
+      transactions.map(async (transaction) => {
+        // Fetch the booking related to the transaction
+        const booking = await Booking.findOne({
+          createdAt: { $gte: new Date(transaction.createdAt) }, // Optional: you can adjust this based on your matching logic
+        });
+
+        if (!booking) {
+          return transaction; // If no booking found, return the transaction as-is
+        }
+
+        // Get the user details from the booking
+        const user = await User.findById(booking.user);
+        const username = user
+          ? `${user.firstname} ${user.lastname}`
+          : "Unknown";
+
+        // Get the pod details from the booking
+        const pod = await productModel.findById(booking.podId);
+        let locationName = "Unknown";
+        let locationDetails = null;
+
+        if (pod && pod.location) {
+          // Fetch the location details if the pod has a location ID
+          const Location = require("../models/locationModel"); // Adjust path as needed
+          locationDetails = await Location.findById(pod.location);
+          locationName = locationDetails?.name || "Unknown";
+        }
+
+        // Enhance the transaction with additional data
+        return {
+          ...transaction.toObject(),
+          podTitle: booking.podTitle,
+          username, // Add username from the related user
+          locationName, // Add location name from the related location
+          locationDetails, // Add full location details if required
+        };
+      })
+    );
+
     res.status(200).json({
       status: 200,
       message: "API successfully fetched the data",
-      data: transactions,
+      data: enhancedTransactions,
     });
   } catch (error) {
     console.error("Error retrieving transactions:", error);
     res.status(500).json({ message: "Failed to retrieve transactions" });
   }
-};
+});
 
 
  const createRate = asyncHandler(async (req, res) => {

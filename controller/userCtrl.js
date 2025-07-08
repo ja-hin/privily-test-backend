@@ -787,9 +787,15 @@ const hostemail= pod.email
     // const bookingDateObj = moment.tz(bookingDate, "Africa/Johannesburg").toDate();
     // const startTimeObj = moment.tz(startTime, "Africa/Johannesburg").toDate();
     // const endTimeObj = moment.tz(endTime, "Africa/Johannesburg").toDate();
-    const bookingDateObj = moment(bookingDate).toDate();
-    const startTimeObj = moment(startTime).toDate();
-    const endTimeObj = moment(endTime).toDate();
+    // const bookingDateObj = moment(bookingDate).toDate();
+    // const startTimeObj = moment(startTime).toDate();
+    // const endTimeObj = moment(endTime).toDate();
+    const bookingDateObj = moment(bookingDate)
+      .tz("Africa/Johannesburg")
+      .toDate();
+    const startTimeObj = moment(startTime).tz("Africa/Johannesburg").toDate();
+    const endTimeObj = moment(endTime).tz("Africa/Johannesburg").toDate();
+
     console.log("startTimeObj:", startTimeObj);
     console.log("endTimeObj:", endTimeObj);
     console.log("bookingDateObj:", bookingDateObj);
