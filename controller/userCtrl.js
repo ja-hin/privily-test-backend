@@ -1570,20 +1570,20 @@ const sendInvoiceEmailWithAttachment = async (booking, user) => {
     to: user.email,
     subject: "Your Booking Invoice",
     html: `<p>Dear ${user.firstname},</p><p>Please find attached the invoice for your booking.</p>`,
-    // attachments: [
-    //   {
-    //     filename: `invoice_${booking._id}.pdf`,
-    //     content: pdfBuffer,
-    //     contentType: "application/pdf",
-    //   },
-    // ],
+    attachments: [
+      {
+        filename: `invoice_${booking._id}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ],
   };
 
   await sendEmail(
     mailOptions.to,
     mailOptions.subject,
     mailOptions.html,
-    // mailOptions.attachments
+    mailOptions.attachments
   );
 };
 const sendInvoiceEmail = asyncHandler(async (req, res) => {
