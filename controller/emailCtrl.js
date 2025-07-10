@@ -2,7 +2,7 @@ const nodemailer = require("nodemailer");
 const asyncHandler = require("express-async-handler");
 const User = require("../models/userModel");
 
-const sendEmail = async (to, subject, html, attachments = []) => {
+const sendEmail = async (to, subject, html = []) => {
   console.log("Sending email to:", to);
   console.log("Subject:", subject);
   console.log("HTML:", html);
@@ -40,7 +40,7 @@ const sendEmail = async (to, subject, html, attachments = []) => {
       to: to,
       subject: subject,
       html: html,
-      attachments: attachments, // <-- Add attachments here
+      // attachments: attachments, // <-- Add attachments here
     };
 
     // Send email
