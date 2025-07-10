@@ -1447,122 +1447,148 @@ const drawTable = (doc, booking, duration, rate, bookingTotal) => {
 };
 
 
+// const generateInvoicePdfBuffer = async (booking, user) => {
+//   console.log("booking",booking)
+// const pod = await productModel.findById(booking.podId);
+// console.log("pod",pod)
+// const rate = pod?.rate;
+// console.log("rate", rate);
+
+// const startTime = new Date(booking.startTime);
+// const endTime = new Date(booking.endTime);
+
+// console.log("pods", startTime,endTime);
+
+
+// const durationInMinutes = Math.round((endTime - startTime) / (1000 * 60)); // 1 min = 60,000 ms
+// const duration = `${durationInMinutes}`;
+// const bookingTotal = durationInMinutes * rate;
+// console.log("duration", duration, rate, bookingTotal);
+
+//   return new Promise((resolve, reject) => {
+//     const doc = new PDFDocument({ margin: 50 });
+//     const buffers = [];
+
+//     doc.on("data", buffers.push.bind(buffers));
+//     doc.on("end", () => {
+//       const pdfData = Buffer.concat(buffers);
+//       resolve(pdfData);
+//     });
+
+//     // COMPANY HEADER
+//     doc.image(logoPath, 50, 50, { width: 200 });
+//     doc.fontSize(16).text("Privily (Pty) Ltd", { align: "right" });
+//     doc.fontSize(10).text("Reg. No.: 2023/832609/07", { align: "right" });
+//     doc.text("9 Mt. Orville, Midlands Estate, Midstream", { align: "right" });
+//     doc.text("Vat No.: 4890315445", { align: "right" });
+//     doc.text("Ph: (+27) 082 4412152 / (+27) 083 212 8647", { align: "right" });
+//     doc.moveDown();
+
+//     // INVOICE METADATA
+//     doc.fontSize(14).text(`Tax Invoice`, {
+//       align: "center",
+//     });
+
+//     doc.moveDown();
+
+//     // BILL TO
+//     doc.fontSize(12).text("BILL TO:", { underline: true });
+//     doc.text(`${booking.user.firstname} ${booking.user.lastname}`);
+//     doc.text(booking.user.email);
+//     if (user.company) doc.text(user.company);
+//     if (user.vatNumber) doc.text(`VAT No.: ${user.vatNumber}`);
+//     doc.fontSize(10).text(`Invoice Date: ${new Date().toLocaleDateString()}`, {
+//       align: "right",
+//     });
+//     doc.text(`Invoice No.: ${booking.invoiceNumber || "0001"}`, {
+//       align: "right",
+//     });
+//     doc.moveDown();
+
+//     // Draw the table with the items
+//     const tableHeight = drawTable(doc, booking, rate, duration, bookingTotal);
+
+//     // Subtotal, VAT, and Total
+// const subtotal = bookingTotal;
+// const vat = subtotal * 0.15;
+// const grandTotal = subtotal;
+
+//     const columnWidths = [240, 50, 50, 70, 70, 70];
+//     const tableStartX = 50;
+//     const totalColumnX =
+//       tableStartX + columnWidths.slice(0, 5).reduce((sum, w) => sum + w, 0);
+
+//     const totalColumnWidth = columnWidths[5]; // 70
+//     const labelX = totalColumnX - 80;
+//     const valueX = totalColumnX;
+
+//     // Subtotal
+//       doc.text("VAT", labelX, tableHeight + 40);
+//       doc.text(`R ${vat.toLocaleString()}`, valueX, tableHeight + 40, {
+//         width: totalColumnWidth,
+//         align: "left",
+//       });
+//     // Total
+//     doc.text("TOTAL", labelX, tableHeight + 60);
+//     doc.text(`R ${grandTotal.toLocaleString()}`, valueX, tableHeight + 60, {
+//       width: totalColumnWidth,
+//       align: "left",
+//     });
+
+//     doc.font("Helvetica");
+
+//     doc.moveDown();
+
+//     // BANK DETAILS
+//     doc.fontSize(10);
+//     doc.text("Bank Details:", 50, doc.y, { align: "left" });
+//     doc.text("Privily (Pty) Ltd", 50, doc.y, { align: "left" });
+//     doc.text("Standard Bank, Branch: 002645", 50, doc.y + 10, {
+//       align: "left",
+//     });
+//     doc.text("Account: 10 20 085 0707", 50, doc.y, { align: "left" });
+//     doc.text("SWIFT: SBZAZAJJ", 50, doc.y, { align: "left" });
+
+//     // Add space after the bank details
+//     doc.moveDown();
+
+//     // doc.text(
+//     //   `Event: Fame Week Africa - Soundproof Pods - ${
+//     //     booking.eventStartDate || "02 Sept 2024"
+//     //   } to ${booking.eventEndDate || "04 Sept 2024"}`
+//     // );
+
+//     doc.end();
+//   });
+// };
+
 const generateInvoicePdfBuffer = async (booking, user) => {
-  console.log("booking",booking)
-const pod = await productModel.findById(booking.podId);
-console.log("pod",pod)
-const rate = pod?.rate;
-console.log("rate", rate);
+  // Add timeout wrapper
+  return Promise.race([
+    new Promise((resolve, reject) => {
+      // Your existing PDF generation code
+      const doc = new PDFDocument({ margin: 50 });
+      const buffers = [];
 
-const startTime = new Date(booking.startTime);
-const endTime = new Date(booking.endTime);
+      // Set a timeout for PDF generation
+      const timeout = setTimeout(() => {
+        reject(new Error("PDF generation timeout"));
+      }, 30000); // 30 seconds
 
-console.log("pods", startTime,endTime);
-
-
-const durationInMinutes = Math.round((endTime - startTime) / (1000 * 60)); // 1 min = 60,000 ms
-const duration = `${durationInMinutes}`;
-const bookingTotal = durationInMinutes * rate;
-console.log("duration", duration, rate, bookingTotal);
-
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
-    const buffers = [];
-
-    doc.on("data", buffers.push.bind(buffers));
-    doc.on("end", () => {
-      const pdfData = Buffer.concat(buffers);
-      resolve(pdfData);
-    });
-
-    // COMPANY HEADER
-    doc.image(logoPath, 50, 50, { width: 200 });
-    doc.fontSize(16).text("Privily (Pty) Ltd", { align: "right" });
-    doc.fontSize(10).text("Reg. No.: 2023/832609/07", { align: "right" });
-    doc.text("9 Mt. Orville, Midlands Estate, Midstream", { align: "right" });
-    doc.text("Vat No.: 4890315445", { align: "right" });
-    doc.text("Ph: (+27) 082 4412152 / (+27) 083 212 8647", { align: "right" });
-    doc.moveDown();
-
-    // INVOICE METADATA
-    doc.fontSize(14).text(`Tax Invoice`, {
-      align: "center",
-    });
-
-    doc.moveDown();
-
-    // BILL TO
-    doc.fontSize(12).text("BILL TO:", { underline: true });
-    doc.text(`${booking.user.firstname} ${booking.user.lastname}`);
-    doc.text(booking.user.email);
-    if (user.company) doc.text(user.company);
-    if (user.vatNumber) doc.text(`VAT No.: ${user.vatNumber}`);
-    doc.fontSize(10).text(`Invoice Date: ${new Date().toLocaleDateString()}`, {
-      align: "right",
-    });
-    doc.text(`Invoice No.: ${booking.invoiceNumber || "0001"}`, {
-      align: "right",
-    });
-    doc.moveDown();
-
-    // Draw the table with the items
-    const tableHeight = drawTable(doc, booking, rate, duration, bookingTotal);
-
-    // Subtotal, VAT, and Total
-const subtotal = bookingTotal;
-const vat = subtotal * 0.15;
-const grandTotal = subtotal;
-
-    const columnWidths = [240, 50, 50, 70, 70, 70];
-    const tableStartX = 50;
-    const totalColumnX =
-      tableStartX + columnWidths.slice(0, 5).reduce((sum, w) => sum + w, 0);
-
-    const totalColumnWidth = columnWidths[5]; // 70
-    const labelX = totalColumnX - 80;
-    const valueX = totalColumnX;
-
-    // Subtotal
-      doc.text("VAT", labelX, tableHeight + 40);
-      doc.text(`R ${vat.toLocaleString()}`, valueX, tableHeight + 40, {
-        width: totalColumnWidth,
-        align: "left",
+      doc.on("data", buffers.push.bind(buffers));
+      doc.on("end", () => {
+        clearTimeout(timeout);
+        const pdfData = Buffer.concat(buffers);
+        resolve(pdfData);
       });
-    // Total
-    doc.text("TOTAL", labelX, tableHeight + 60);
-    doc.text(`R ${grandTotal.toLocaleString()}`, valueX, tableHeight + 60, {
-      width: totalColumnWidth,
-      align: "left",
-    });
 
-    doc.font("Helvetica");
-
-    doc.moveDown();
-
-    // BANK DETAILS
-    doc.fontSize(10);
-    doc.text("Bank Details:", 50, doc.y, { align: "left" });
-    doc.text("Privily (Pty) Ltd", 50, doc.y, { align: "left" });
-    doc.text("Standard Bank, Branch: 002645", 50, doc.y + 10, {
-      align: "left",
-    });
-    doc.text("Account: 10 20 085 0707", 50, doc.y, { align: "left" });
-    doc.text("SWIFT: SBZAZAJJ", 50, doc.y, { align: "left" });
-
-    // Add space after the bank details
-    doc.moveDown();
-
-    // doc.text(
-    //   `Event: Fame Week Africa - Soundproof Pods - ${
-    //     booking.eventStartDate || "02 Sept 2024"
-    //   } to ${booking.eventEndDate || "04 Sept 2024"}`
-    // );
-
-    doc.end();
-  });
+      // Rest of your PDF code...
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("PDF generation timeout")), 30000)
+    ),
+  ]);
 };
-
-
 const sendInvoiceEmailWithAttachment = async (booking, user) => {
   const pdfBuffer = await generateInvoicePdfBuffer(booking, user);
 
@@ -1586,26 +1612,72 @@ const sendInvoiceEmailWithAttachment = async (booking, user) => {
     mailOptions.attachments
   );
 };
+// const sendInvoiceEmail = asyncHandler(async (req, res) => {
+//   const { bookingId } = req.params;
+//   validateMongoDbId(bookingId);
+
+//   const booking = await Booking.findById(bookingId).populate("user");
+
+//   if (!booking) {
+//     return res.status(404).json({ message: "Booking not found" });
+//   }
+
+//   const user = booking.user;
+//   if (!user) {
+//     return res.status(404).json({ message: "User not found" });
+//   }
+
+//   await sendInvoiceEmailWithAttachment(booking, user);
+
+//   res.json({ message: "Invoice PDF sent successfully" });
+// });
+
 const sendInvoiceEmail = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
   validateMongoDbId(bookingId);
 
+  console.log(`Starting invoice generation for booking: ${bookingId}`);
+  const startTime = Date.now();
+
+  try {
+    const booking = await Booking.findById(bookingId).populate("user");
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    const user = booking.user;
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log(`Generating PDF for user: ${user.email}`);
+try {
   const booking = await Booking.findById(bookingId).populate("user");
-
-  if (!booking) {
-    return res.status(404).json({ message: "Booking not found" });
+  if (booking && booking.user) {
+    await sendInvoiceEmailWithAttachment(booking, booking.user);
+    console.log("Invoice sent successfully");
   }
+} catch (error) {
+  console.error("Background invoice sending failed:", error);
+}
+    const endTime = Date.now();
+    console.log(`Invoice sent successfully in ${endTime - startTime}ms`);
 
-  const user = booking.user;
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
+    res.json({ message: "Invoice PDF sent successfully" });
+  } catch (error) {
+    const endTime = Date.now();
+    console.error(
+      `Invoice generation failed after ${endTime - startTime}ms:`,
+      error
+    );
+
+    res.status(500).json({
+      message: "Failed to send invoice",
+      error: error.message,
+    });
   }
-
-  await sendInvoiceEmailWithAttachment(booking, user);
-
-  res.json({ message: "Invoice PDF sent successfully" });
 });
-
 const updateBookingById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
