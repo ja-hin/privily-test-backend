@@ -1652,15 +1652,8 @@ const sendInvoiceEmail = asyncHandler(async (req, res) => {
     }
 
     console.log(`Generating PDF for user: ${user.email}`);
-try {
-  const booking = await Booking.findById(bookingId).populate("user");
-  if (booking && booking.user) {
-    await sendInvoiceEmailWithAttachment(booking, booking.user);
-    console.log("Invoice sent successfully");
-  }
-} catch (error) {
-  console.error("Background invoice sending failed:", error);
-}
+    await sendInvoiceEmailWithAttachment(booking, user);
+
     const endTime = Date.now();
     console.log(`Invoice sent successfully in ${endTime - startTime}ms`);
 
