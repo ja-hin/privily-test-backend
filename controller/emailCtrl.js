@@ -8,16 +8,32 @@ const sendEmail = async (to, subject, html, attachments = []) => {
   console.log("HTML:", html);
 
   try {
+    // let transporter = nodemailer.createTransport({
+    //   host: "smtp.gmail.com",
+    //   service: "gmail",
+    //   port: 587,
+    //   secure: true,
+    //   auth: {
+    //     user: process.env.MAIL_ID,
+    //     pass: process.env.MP,
+    //   },
+    // });
     let transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      service: "gmail",
+      host: "smtp.example.com",
       port: 587,
-      secure: true,
+      secure: false,
       auth: {
-        user: process.env.MAIL_ID,
-        pass: process.env.MP,
+            user: process.env.MAIL_ID,
+            pass: process.env.MP,
       },
+      tls: {
+        rejectUnauthorized: false,
+      },
+      connectionTimeout: 5000, // 5 seconds connection timeout
+      greetingTimeout: 3000, // 3 seconds greeting timeout
+      socketTimeout: 5000, // 5 seconds socket timeout
     });
+
 
     const mailOptions = {
       from: '"Privily" <info@privily.co>',

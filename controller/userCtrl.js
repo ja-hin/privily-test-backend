@@ -1562,8 +1562,6 @@ const grandTotal = subtotal;
   });
 };
 
-// Sample booking and user objects to test the function
-
 
 const sendInvoiceEmailWithAttachment = async (booking, user) => {
   const pdfBuffer = await generateInvoicePdfBuffer(booking, user);
