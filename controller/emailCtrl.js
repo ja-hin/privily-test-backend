@@ -29,9 +29,9 @@ const sendEmail = async (to, subject, html, attachments = []) => {
       tls: {
         rejectUnauthorized: false,
       },
-      connectionTimeout: 10000, // 5 seconds connection timeout
-      greetingTimeout: 10000, // 3 seconds greeting timeout
-      socketTimeout: 10000, // 5 seconds socket timeout
+      connectionTimeout: 20000, // 5 seconds connection timeout
+      greetingTimeout: 20000, // 3 seconds greeting timeout
+      socketTimeout: 20000, // 5 seconds socket timeout
     });
 
 
