@@ -19,12 +19,12 @@ const sendEmail = async (to, subject, html, attachments = []) => {
     //   },
     // });
     let transporter = nodemailer.createTransport({
-      host: "smtp.example.com",
+      host: "smtp.gmail.com",
       port: 587,
       secure: false,
       auth: {
-            user: process.env.MAIL_ID,
-            pass: process.env.MP,
+        user: process.env.MAIL_ID,
+        pass: process.env.MP,
       },
       tls: {
         rejectUnauthorized: false,
