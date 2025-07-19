@@ -8,17 +8,7 @@ const sendEmail = async (to, subject, html, attachments = []) => {
   console.log("HTML:", html);
 
   try {
-    // let transporter = nodemailer.createTransport({
-    //   host: "smtp.gmail.com",
-    //   service: "gmail",
-    //   port: 465,
-    //   secure: true,
-    //   auth: {
-    //     user: process.env.MAIL_ID,
-    //     pass: process.env.MP,
-    //   },
-    // });
-    let transporter = nodemailer.createTransporter({
+    let transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       service: "gmail",
       port: 465,
@@ -38,7 +28,7 @@ const sendEmail = async (to, subject, html, attachments = []) => {
       to: to,
       subject: subject,
       html: html,
-      attachments: attachments, // <-- Add attachments here
+      attachments: attachments, 
     };
 
     // Send email

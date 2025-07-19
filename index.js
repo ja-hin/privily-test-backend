@@ -20,6 +20,8 @@ const morgan = require("morgan");
 const cors = require("cors");
 const { createPayment } = require("./controller/PaymentCtrl");
 
+require('./cron/bookingcron');
+
 dbConnect();
 app.use(morgan("dev"));
 app.use(cors());

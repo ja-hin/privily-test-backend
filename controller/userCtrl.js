@@ -947,9 +947,180 @@ const hostemail= pod.email
   }
 });
 
+// const sendNotificationOnBooking = asyncHandler(
+//   async (user = null, booking, userId = null) => {
+//    console.log("bookingimp", booking)
+//     try {
+//       if (!user && !userId) {
+//         throw new Error("Any one of User or UserId is required");
+//       }
+//       if (!user) {
+//         user = await User.findById(userId);
+//       }
+//       if (!user) throw new Error("User not found");
+
+//       booking = booking.populate("podId");
+//       if (!booking) throw new Error("Booking not found");
+
+//       // Format booking date and times
+//       const formattedBookingDate = booking.bookingDate.toDateString();
+//       const formattedStartTime = moment(booking.startTime)
+//         // .tz("Africa/Johannesburg")
+//         .format("hh:mm A");
+//       const formattedEndTime = moment(booking.endTime)
+//         // .tz("Africa/Johannesburg")
+//         .format("hh:mm A");
+
+//       // Construct email content
+//       const emailContent = `
+//       <p>Hi ${user.firstname},</p>
+//       <p>Your booking details:</p>
+//       <ul>
+//         <li><strong>Booking ID:</strong> ${booking._id}</li>
+//         <li><strong>Booking Date:</strong> ${formattedBookingDate}</li>
+//         <li><strong>Start Time:</strong> ${formattedStartTime}</li>
+//         <li><strong>End Time:</strong> ${formattedEndTime}</li>
+//         <li><strong>Pod ID:</strong> ${booking.podId}</li>
+//         <li><strong>Pod Title:</strong> ${booking.podTitle}</li>
+//       </ul>
+//       <p>Thank you for booking with us!</p>
+//     `;
+
+//       // Send email
+//       const data = {
+//         to: user.email,
+//         subject: "Booking Notification",
+//         html: emailContent,
+//       };
+//       await sendEmail(data.to, data.subject, data.html);
+//       console.log("Email sent successfully.");
+//     } catch (error) {
+//       console.error("Error sending notification:", error.message);
+//       throw new Error("Failed to send notification");
+//     }
+//   }
+// );
+
+
+
+const generateInvoicePDF = async (user, booking) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 50 });
+      const invoiceDir = path.join(__dirname, '../invoices');
+      
+      // Create invoices directory if it doesn't exist
+      if (!fs.existsSync(invoiceDir)) {
+        fs.mkdirSync(invoiceDir, { recursive: true });
+      }
+      
+      const filename = `invoice_${booking._id}_${Date.now()}.pdf`;
+      const filepath = path.join(invoiceDir, filename);
+      
+      // Pipe the PDF to a file
+      doc.pipe(fs.createWriteStream(filepath));
+      
+      // Add company header
+      doc.fontSize(20).text('INVOICE', 50, 50, { align: 'center' });
+      doc.moveDown();
+      
+      // Company details (customize with your company info)
+      doc.fontSize(12)
+         .text('Your Company Name', 50, 100)
+         .text('Your Address', 50, 115)
+         .text('City, State, ZIP', 50, 130)
+         .text('Phone: Your Phone Number', 50, 145)
+         .text('Email: your@email.com', 50, 160);
+      
+      // Invoice details
+      doc.text(`Invoice #: INV-${booking._id}`, 350, 100)
+         .text(`Date: ${new Date().toDateString()}`, 350, 115)
+         .text(`Due Date: ${new Date().toDateString()}`, 350, 130);
+      
+      // Customer details
+      doc.moveDown(2);
+      doc.text('Bill To:', 50, 200)
+         .text(`${user.firstname} ${user.lastname || ''}`, 50, 215)
+         .text(`${user.email}`, 50, 230)
+         .text(`${user.mobile || 'N/A'}`, 50, 245);
+      
+      // Booking details section
+      doc.moveDown(2);
+      const formattedBookingDate = booking.bookingDate.toDateString();
+      const formattedStartTime = moment(booking.startTime).format("hh:mm A");
+      const formattedEndTime = moment(booking.endTime).format("hh:mm A");
+      
+      // Table header
+      const tableTop = 320;
+      doc.text('Description', 50, tableTop)
+         .text('Date', 250, tableTop)
+         .text('Time', 350, tableTop)
+         .text('Amount', 450, tableTop);
+      
+      // Draw line under header
+      doc.moveTo(50, tableTop + 15)
+         .lineTo(550, tableTop + 15)
+         .stroke();
+      
+      // Table content
+      const itemTop = tableTop + 30;
+      doc.text(`${booking.podTitle} - ${booking.bookingPurpose || 'Pod Booking'}`, 50, itemTop)
+         .text(formattedBookingDate, 250, itemTop)
+         .text(`${formattedStartTime} - ${formattedEndTime}`, 350, itemTop);
+      
+      // Calculate duration and amount (customize pricing logic as needed)
+      const duration = moment(booking.endTime).diff(moment(booking.startTime), 'hours', true);
+      const hourlyRate = booking.podId?.price || 50; // Default rate or get from pod
+      const totalAmount = (duration * hourlyRate).toFixed(2);
+      
+      doc.text(`$${totalAmount}`, 450, itemTop);
+      
+      // Draw line under item
+      doc.moveTo(50, itemTop + 15)
+         .lineTo(550, itemTop + 15)
+         .stroke();
+      
+      // Total section
+      const totalTop = itemTop + 50;
+      doc.text('Subtotal:', 400, totalTop)
+         .text(`$${totalAmount}`, 450, totalTop);
+      
+      doc.text('Tax (0%):', 400, totalTop + 15)
+         .text('$0.00', 450, totalTop + 15);
+      
+      doc.fontSize(14).text('Total:', 400, totalTop + 40)
+         .text(`$${totalAmount}`, 450, totalTop + 40);
+      
+      // Payment terms
+      doc.fontSize(10)
+         .text('Payment Terms: Due upon receipt', 50, totalTop + 80)
+         .text('Thank you for your business!', 50, totalTop + 100);
+      
+      // Add booking details
+      doc.moveDown(2);
+      doc.text('Booking Details:', 50, totalTop + 130)
+         .text(`Booking ID: ${booking._id}`, 50, totalTop + 145)
+         .text(`Pod Serial: ${booking.serial}`, 50, totalTop + 160)
+         .text(`Location: ${booking.location || 'N/A'}`, 50, totalTop + 175)
+         .text(`Status: ${booking.status}`, 50, totalTop + 190);
+      
+      // Finalize the PDF
+      doc.end();
+      
+      // Wait for the PDF to be written completely
+      doc.on('end', () => {
+        resolve(filepath);
+      });
+      
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
 const sendNotificationOnBooking = asyncHandler(
   async (user = null, booking, userId = null) => {
-   console.log("bookingimp", booking)
+    console.log("bookingimp", booking);
     try {
       if (!user && !userId) {
         throw new Error("Any one of User or UserId is required");
@@ -959,47 +1130,104 @@ const sendNotificationOnBooking = asyncHandler(
       }
       if (!user) throw new Error("User not found");
 
-      booking = booking.populate("podId");
+      // Populate booking with pod details
+      if (typeof booking.populate === 'function') {
+        booking = await booking.populate("podId");
+      } else {
+        // If booking is already a plain object, fetch pod details separately
+        const Pod = require('../models/productModel'); // Adjust path as needed
+        booking.podId = await Pod.findById(booking.podId);
+      }
+      
       if (!booking) throw new Error("Booking not found");
 
       // Format booking date and times
       const formattedBookingDate = booking.bookingDate.toDateString();
-      const formattedStartTime = moment(booking.startTime)
-        // .tz("Africa/Johannesburg")
-        .format("hh:mm A");
-      const formattedEndTime = moment(booking.endTime)
-        // .tz("Africa/Johannesburg")
-        .format("hh:mm A");
+      const formattedStartTime = moment(booking.startTime).format("hh:mm A");
+      const formattedEndTime = moment(booking.endTime).format("hh:mm A");
+
+      // Generate invoice PDF
+      console.log("Generating invoice PDF...");
+      const invoicePath = await generateInvoicePDF(user, booking);
+      console.log("Invoice PDF generated at:", invoicePath);
 
       // Construct email content
       const emailContent = `
-      <p>Hi ${user.firstname},</p>
-      <p>Your booking details:</p>
-      <ul>
-        <li><strong>Booking ID:</strong> ${booking._id}</li>
-        <li><strong>Booking Date:</strong> ${formattedBookingDate}</li>
-        <li><strong>Start Time:</strong> ${formattedStartTime}</li>
-        <li><strong>End Time:</strong> ${formattedEndTime}</li>
-        <li><strong>Pod ID:</strong> ${booking.podId}</li>
-        <li><strong>Pod Title:</strong> ${booking.podTitle}</li>
-      </ul>
-      <p>Thank you for booking with us!</p>
-    `;
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">Booking Confirmation</h2>
+          <p>Hi ${user.firstname},</p>
+          <p>Thank you for your booking! Please find your booking details and invoice below:</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #333; margin-top: 0;">Booking Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Booking ID:</td>
+                <td style="padding: 8px 0;">${booking._id}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Date:</td>
+                <td style="padding: 8px 0;">${formattedBookingDate}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Time:</td>
+                <td style="padding: 8px 0;">${formattedStartTime} - ${formattedEndTime}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Pod:</td>
+                <td style="padding: 8px 0;">${booking.podTitle}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Location:</td>
+                <td style="padding: 8px 0;">${booking.location || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Status:</td>
+                <td style="padding: 8px 0;">${booking.status}</td>
+              </tr>
+            </table>
+          </div>
+          
+          <p>Your invoice is attached to this email. Please keep it for your records.</p>
+          <p>If you have any questions, please don't hesitate to contact us.</p>
+          <p>Thank you for booking with us!</p>
+        </div>
+      `;
 
-      // Send email
-      const data = {
+      // Send email with attachment
+      const emailData = {
         to: user.email,
-        subject: "Booking Notification",
+        subject: "Booking Confirmation & Invoice",
         html: emailContent,
+        attachments: [
+          {
+            filename: `Invoice_${booking._id}.pdf`,
+            path: invoicePath,
+            contentType: 'application/pdf'
+          }
+        ]
       };
-      await sendEmail(data.to, data.subject, data.html);
-      console.log("Email sent successfully.");
+
+      await sendEmail(emailData.to, emailData.subject, emailData.html, emailData.attachments);
+      console.log("Email with invoice sent successfully.");
+
+      // Clean up - delete the temporary invoice file after sending
+      // Uncomment the following lines if you want to delete the file after sending
+      // setTimeout(() => {
+      //   if (fs.existsSync(invoicePath)) {
+      //     fs.unlinkSync(invoicePath);
+      //     console.log("Temporary invoice file deleted.");
+      //   }
+      // }, 5000); // Delete after 5 seconds
+
     } catch (error) {
       console.error("Error sending notification:", error.message);
       throw new Error("Failed to send notification");
     }
   }
 );
+
+
 
 const sendNotificationOnHost = asyncHandler(
   async (user = null, booking, hostemail) => {
@@ -1243,7 +1471,6 @@ const getBookings = asyncHandler(async (req, res) => {
   }
 });
 
-// Get a booking by ID for admin to manage and update status of booking as per the status
 const getBookingById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
@@ -1254,7 +1481,6 @@ const getBookingById = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
-// Add this in your booking controller file:
 
 
 // const generateInvoicePdfBuffer = (booking, user) => {
@@ -1395,56 +1621,56 @@ const getBookingById = asyncHandler(async (req, res) => {
 //     doc.end();
 //   });
 // };
-const drawTable = (doc, booking, duration, rate, bookingTotal) => {
-  const tableTop = doc.y;
-  const rowHeight = 20;
-  const columnWidths = [240, 50, 50, 70, 70, 70];
-  const tableWidth = columnWidths.reduce((acc, width) => acc + width, 0);
-  const cellPadding = 5;
+// const drawTable = (doc, booking, duration, rate, bookingTotal) => {
+//   const tableTop = doc.y;
+//   const rowHeight = 20;
+//   const columnWidths = [240, 50, 50, 70, 70, 70];
+//   const tableWidth = columnWidths.reduce((acc, width) => acc + width, 0);
+//   const cellPadding = 5;
 
-  doc
-    .font("Helvetica-Bold")
-    .text("DESCRIPTION", 50 + cellPadding, tableTop, {
-      width: columnWidths[0] - cellPadding,
-      align: "left",
-    })
-    .text("DURATION", 400, tableTop, {
-      width: columnWidths[3],
-      align: "center",
-    })
-    .text("RATE", 470, tableTop, { width: columnWidths[4], align: "center" })
-    .text("TOTAL", 540, tableTop, { width: columnWidths[5], align: "center" });
+//   doc
+//     .font("Helvetica-Bold")
+//     .text("DESCRIPTION", 50 + cellPadding, tableTop, {
+//       width: columnWidths[0] - cellPadding,
+//       align: "left",
+//     })
+//     .text("DURATION", 400, tableTop, {
+//       width: columnWidths[3],
+//       align: "center",
+//     })
+//     .text("RATE", 470, tableTop, { width: columnWidths[4], align: "center" })
+//     .text("TOTAL", 540, tableTop, { width: columnWidths[5], align: "center" });
 
-  // Header row border
-  doc.rect(50, tableTop - 5, tableWidth, rowHeight).stroke();
+//   // Header row border
+//   doc.rect(50, tableTop - 5, tableWidth, rowHeight).stroke();
 
-  const rowTop = tableTop + rowHeight;
+//   const rowTop = tableTop + rowHeight;
 
-  doc
-    .font("Helvetica")
-    .text(booking.podTitle, 50 + cellPadding, rowTop, {
-      width: columnWidths[0] - cellPadding,
-      align: "left",
-    })
+//   doc
+//     .font("Helvetica")
+//     .text(booking.podTitle, 50 + cellPadding, rowTop, {
+//       width: columnWidths[0] - cellPadding,
+//       align: "left",
+//     })
 
-    .text(`R ${rate.toLocaleString()}`, 470, rowTop, {
-      width: columnWidths[4],
-      align: "center",
-    })
-    .text(duration, 400, rowTop, {
-      width: columnWidths[3],
-      align: "center",
-    })
-    .text(`R ${bookingTotal.toLocaleString()}`, 540, rowTop, {
-      width: columnWidths[5],
-      align: "center",
-    });
+//     .text(`R ${rate.toLocaleString()}`, 470, rowTop, {
+//       width: columnWidths[4],
+//       align: "center",
+//     })
+//     .text(duration, 400, rowTop, {
+//       width: columnWidths[3],
+//       align: "center",
+//     })
+//     .text(`R ${bookingTotal.toLocaleString()}`, 540, rowTop, {
+//       width: columnWidths[5],
+//       align: "center",
+//     });
 
-  // Row border
-  doc.rect(50, rowTop - 5, tableWidth, rowHeight).stroke();
+//   // Row border
+//   doc.rect(50, rowTop - 5, tableWidth, rowHeight).stroke();
 
-  return rowTop + rowHeight;
-};
+//   return rowTop + rowHeight;
+// };
 
 
 // const generateInvoicePdfBuffer = async (booking, user) => {
@@ -1562,115 +1788,118 @@ const drawTable = (doc, booking, duration, rate, bookingTotal) => {
 //   });
 // };
 
-const generateInvoicePdfBuffer = async (booking, user) => {
-  // Add timeout wrapper
-  return Promise.race([
-    new Promise((resolve, reject) => {
-      // Your existing PDF generation code
-      const doc = new PDFDocument({ margin: 50 });
-      const buffers = [];
+// // const generateInvoicePdfBuffer = async (booking, user) => {
+// //   // Add timeout wrapper
+// //   return Promise.race([
+// //     new Promise((resolve, reject) => {
+// //       // Your existing PDF generation code
+// //       const doc = new PDFDocument({ margin: 50 });
+// //       const buffers = [];
 
-      // Set a timeout for PDF generation
-      const timeout = setTimeout(() => {
-        reject(new Error("PDF generation timeout"));
-      }, 30000); // 30 seconds
+// //       // Set a timeout for PDF generation
+// //       const timeout = setTimeout(() => {
+// //         reject(new Error("PDF generation timeout"));
+// //       }, 30000); // 30 seconds
 
-      doc.on("data", buffers.push.bind(buffers));
-      doc.on("end", () => {
-        clearTimeout(timeout);
-        const pdfData = Buffer.concat(buffers);
-        resolve(pdfData);
-      });
+// //       doc.on("data", buffers.push.bind(buffers));
+// //       doc.on("end", () => {
+// //         clearTimeout(timeout);
+// //         const pdfData = Buffer.concat(buffers);
+// //         resolve(pdfData);
+// //       });
 
-      // Rest of your PDF code...
-    }),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("PDF generation timeout")), 30000)
-    ),
-  ]);
-};
-const sendInvoiceEmailWithAttachment = async (booking, user) => {
-  const pdfBuffer = await generateInvoicePdfBuffer(booking, user);
+// //       // Rest of your PDF code...
+// //     }),
+// //     new Promise((_, reject) =>
+// //       setTimeout(() => reject(new Error("PDF generation timeout")), 30000)
+// //     ),
+// //   ]);
+// // };
+// const sendInvoiceEmailWithAttachment = async (booking, user) => {
+//   const pdfBuffer = await generateInvoicePdfBuffer(booking, user);
 
-  const mailOptions = {
-    to: user.email,
-    subject: "Your Booking Invoice",
-    html: `<p>Dear ${user.firstname},</p><p>Please find attached the invoice for your booking.</p>`,
-    attachments: [
-      {
-        filename: `invoice_${booking._id}.pdf`,
-        content: pdfBuffer,
-        contentType: "application/pdf",
-      },
-    ],
-  };
+//   const mailOptions = {
+//     to: user.email,
+//     subject: "Your Booking Invoice",
+//     html: `<p>Dear ${user.firstname},</p><p>Please find attached the invoice for your booking.</p>`,
+//     attachments: [
+//       {
+//         filename: `invoice_${booking._id}.pdf`,
+//         content: pdfBuffer,
+//         contentType: "application/pdf",
+//       },
+//     ],
+//   };
 
-  await sendEmail(
-    mailOptions.to,
-    mailOptions.subject,
-    mailOptions.html,
-    mailOptions.attachments
-  );
-};
+//   await sendEmail(
+//     mailOptions.to,
+//     mailOptions.subject,
+//     mailOptions.html,
+//     mailOptions.attachments
+//   );
+// };
+// // const sendInvoiceEmail = asyncHandler(async (req, res) => {
+// //   const { bookingId } = req.params;
+// //   validateMongoDbId(bookingId);
+
+// //   const booking = await Booking.findById(bookingId).populate("user");
+
+// //   if (!booking) {
+// //     return res.status(404).json({ message: "Booking not found" });
+// //   }
+
+// //   const user = booking.user;
+// //   if (!user) {
+// //     return res.status(404).json({ message: "User not found" });
+// //   }
+
+// //   await sendInvoiceEmailWithAttachment(booking, user);
+
+// //   res.json({ message: "Invoice PDF sent successfully" });
+// // });
+
 // const sendInvoiceEmail = asyncHandler(async (req, res) => {
 //   const { bookingId } = req.params;
 //   validateMongoDbId(bookingId);
 
-//   const booking = await Booking.findById(bookingId).populate("user");
+//   console.log(`Starting invoice generation for booking: ${bookingId}`);
+//   const startTime = Date.now();
 
-//   if (!booking) {
-//     return res.status(404).json({ message: "Booking not found" });
+//   try {
+//     const booking = await Booking.findById(bookingId).populate("user");
+
+//     if (!booking) {
+//       return res.status(404).json({ message: "Booking not found" });
+//     }
+
+//     const user = booking.user;
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     console.log(`Generating PDF for user: ${user.email}`);
+//     await sendInvoiceEmailWithAttachment(booking, user);
+
+//     const endTime = Date.now();
+//     console.log(`Invoice sent successfully in ${endTime - startTime}ms`);
+
+//     res.json({ message: "Invoice PDF sent successfully" });
+//   } catch (error) {
+//     const endTime = Date.now();
+//     console.error(
+//       `Invoice generation failed after ${endTime - startTime}ms:`,
+//       error
+//     );
+
+//     res.status(500).json({
+//       message: "Failed to send invoice",
+//       error: error.message,
+//     });
 //   }
-
-//   const user = booking.user;
-//   if (!user) {
-//     return res.status(404).json({ message: "User not found" });
-//   }
-
-//   await sendInvoiceEmailWithAttachment(booking, user);
-
-//   res.json({ message: "Invoice PDF sent successfully" });
 // });
 
-const sendInvoiceEmail = asyncHandler(async (req, res) => {
-  const { bookingId } = req.params;
-  validateMongoDbId(bookingId);
 
-  console.log(`Starting invoice generation for booking: ${bookingId}`);
-  const startTime = Date.now();
 
-  try {
-    const booking = await Booking.findById(bookingId).populate("user");
-
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
-    }
-
-    const user = booking.user;
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    console.log(`Generating PDF for user: ${user.email}`);
-    await sendInvoiceEmailWithAttachment(booking, user);
-
-    const endTime = Date.now();
-    console.log(`Invoice sent successfully in ${endTime - startTime}ms`);
-
-    res.json({ message: "Invoice PDF sent successfully" });
-  } catch (error) {
-    const endTime = Date.now();
-    console.error(
-      `Invoice generation failed after ${endTime - startTime}ms:`,
-      error
-    );
-
-    res.status(500).json({
-      message: "Failed to send invoice",
-      error: error.message,
-    });
-  }
-});
 const updateBookingById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   validateMongoDbId(id);
@@ -2434,6 +2663,5 @@ module.exports = {
   unblockStaff,
   deleteStaff,
   editStaff,
-  sendInvoiceEmail,
   getUserByID
 };

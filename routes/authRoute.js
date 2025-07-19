@@ -44,7 +44,6 @@ const {
   deleteStaff,
   editStaff,
   updatebookingstatus,
-  sendInvoiceEmail,
   getUserByID,
   verifyEmail,
   getAllRatings,
@@ -100,7 +99,7 @@ router.put("/feedback/:id",  bookingFeedback);
 router.get("/:id", authMiddleware, isAdmin, getaUser);
 router.post("/corporate-pods", corporatePods);
 router.post('/extend/:bookingId', authMiddleware, extendBooking);
-router.post("/send-invoice/:bookingId", authMiddleware, sendInvoiceEmail);
+// router.post("/send-invoice/:bookingId", authMiddleware, sendInvoiceEmail);
 
 router.put(
   "/auto-update-booking-status",
