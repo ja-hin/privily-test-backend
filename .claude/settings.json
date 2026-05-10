@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(\"/Users/dimplekumari/Documents/privily-admin/node_modules/.bin/tsc\" --noEmit --project \"/Users/dimplekumari/Documents/privily-admin/tsconfig.json\")",
+      "Bash(xargs ls *)"
+    ],
+    "additionalDirectories": [
+      "/Users/dimplekumari/Documents/privily-admin/app/pod/[id]",
+      "/Users/dimplekumari/Documents/privily-admin/app/locations",
+      "/Users/dimplekumari/Documents/privily-admin/app/pods"
+    ]
+  }
+}
