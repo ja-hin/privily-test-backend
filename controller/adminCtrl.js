@@ -223,9 +223,19 @@ const getAllUsersAdmin = asyncHandler(async (req, res) => {
 // GET /api/admin/transactions?page=&limit=&status=
 const getAllTransactionsAdmin = asyncHandler(async (req, res) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, startDate, endDate, search } = req.query;
     const filter = {};
     if (status && status !== "all") filter.status = status;
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) { const e = new Date(endDate); e.setHours(23,59,59,999); filter.createdAt.$lte = e; }
+    }
+    if (search) filter.$or = [
+      { checkoutId: { $regex: search, $options: 'i' } },
+      { _id: search.length === 24 ? search : undefined },
+      { merchantId: { $regex: search, $options: 'i' } },
+    ].filter(c => Object.values(c)[0] !== undefined);
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const total = await Transaction.countDocuments(filter);
     const transactions = await Transaction.find(filter)

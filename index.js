@@ -16,6 +16,10 @@ const uploadRouter = require("./routes/UploadRouter");
 const Paymentrouter = require("./routes/PaymentRoute")
 const TransactionRouter = require("./routes/TransactionRouter");
 const adminRouter = require("./routes/adminRoute");
+const appVersionRouter = require("./routes/appVersionRoute");
+
+
+
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const cors = require("cors");
@@ -37,7 +41,7 @@ app.use("/api/upload", uploadRouter);
 app.use("/api/pages", pageRouter)
 app.use("/api/location", locationRouter);
 app.use("/api/rating", locationRouter);
-
+app.use("/api/app", appVersionRouter);
 app.use("/api/dashboard", dashBoardRoute);
 app.use("/api", uploadRouter);
 app.use("/api/payments", Paymentrouter);

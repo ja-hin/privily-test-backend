@@ -24,6 +24,11 @@ var locationSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  rate: {
+    type: Number,
+    default: 0,
+  },
+
   state: {
     type: String,
     required: true,

@@ -18,7 +18,7 @@ const createPayment = async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.YOCO_SECRET_KEY}`,
+          Authorization: `Bearer ${process.env.YOCO_SECRET_KEY_LIVE}`,
         },
       }
     );

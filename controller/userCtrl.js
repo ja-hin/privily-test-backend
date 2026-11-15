@@ -1,6 +1,7 @@
 const User = require("../models/userModel");
 const Booking = require("../models/bookingModel")
 const Location = require("../models/locationModel");
+const Transaction = require("../models/Transaction");
 ;
 const asyncHandler = require("express-async-handler");
 const { generateToken } = require("../config/jwtToken");
@@ -25,7 +26,7 @@ const fs = require("fs");
 const path = require("path");
 const { Mongoose } = require("mongoose");
 const logoPath = path.join(__dirname, "Logo.png");
-
+const { generateInvoicePDF, zar } = require("./invoiceService");
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
@@ -62,7 +63,41 @@ const createUser = asyncHandler(async (req, res) => {
     res.status(500).send("Failed to register user");
   }
 });
+const deleteMyAccount = asyncHandler(async (req, res) => {
+  // Identity comes from the verified token and NOWHERE else. Never take a user
+  // id from req.body or req.params here - that would let any logged-in user
+  // delete somebody else's account just by changing the id they send.
+  const userId = req.user?._id;
 
+  if (!userId) {
+    return res.status(401).json({ message: "Not authorised" });
+  }
+
+  // Bookings first, user second. If the booking delete fails we bail out with
+  // the account still intact and the user can retry. The other order would
+  // leave orphaned bookings pointing at a user that no longer exists.
+  const bookings = await Booking.deleteMany({ user: userId });
+
+  // ── Anonymise-instead alternative (see note above) ──
+  // const now = new Date();
+  // await Booking.deleteMany({ user: userId, startTime: { $gte: now } });
+  // await Booking.updateMany(
+  //   { user: userId },
+  //   { $set: { user: null, customerName: "Deleted user", customerEmail: null,
+  //             customerPhone: null, deletedAt: now } }
+  // );
+
+  const deletedUser = await User.findByIdAndDelete(userId);
+
+  if (!deletedUser) {
+    return res.status(404).json({ message: "Account not found" });
+  }
+
+  res.json({
+    message: "Account deleted",
+    bookingsDeleted: bookings.deletedCount,
+  });
+});
 const registerAndAssignRoles = asyncHandler(async (req, res) => {
   const { firstname, lastname, email, phoneNumber, password, role, auth_page } =
     req.body;
@@ -135,14 +170,24 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
   }
 });
 
+const APP_HASH_RE = /^[A-Za-z0-9+/]{11}$/;
+
+const resolveAppHash = (raw) => {
+  const candidate = String(raw || "").trim();
+  if (APP_HASH_RE.test(candidate)) return candidate;
+  // Fallback for older app builds that don't send it yet.
+  const fallback = String(process.env.ANDROID_APP_HASH || "").trim();
+  return APP_HASH_RE.test(fallback) ? fallback : null;
+};
+
 const loginMobileUserCtrl = asyncHandler(async (req, res) => {
-  const { phoneNumber } = req.body;
+  const { phoneNumber, appSignatureHash } = req.body;
   if (!phoneNumber) {
     return res.status(400).send("Phone number is required");
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // valid 10 minutes
 
   try {
     let mobileUser = await MobileUserModel.findOne({ phoneNumber });
@@ -154,18 +199,24 @@ const loginMobileUserCtrl = asyncHandler(async (req, res) => {
     mobileUser.otpExpires = otpExpires;
     await mobileUser.save();
 
-    // await twilioClient.messages.create({
-    //   body: `Your Privily App One Time password is ${otp}`,
-    //   from: process.env.TWILIO_PHONE_NUMBER,
-    //   to: phoneNumber,
-    // });
+    const appHash = resolveAppHash(appSignatureHash);
+    if (!appHash) {
+      console.warn(
+        `OTP for ${phoneNumber}: no valid app hash (client sent: ${appSignatureHash}). Autofill will not work.`
+      );
+    }
+
+    // SMS Retriever requires: starts with "<#>", and the 11-char hash is the
+    // LAST thing in the message. Whole body must stay under 140 bytes.
+    const body = appHash
+      ? `<#> Your Privily App OTP is ${otp}\n${appHash}`
+      : `Your Privily App OTP is ${otp}`;
 
     await twilioClient.messages.create({
-      body: `Your Privily App One Time password is ${otp}\n\nPrivilyApp <#>\nAqYx/FD1LBD`,
+      body,
       from: process.env.TWILIO_PHONE_NUMBER,
       to: phoneNumber,
     });
-
 
     res.send("OTP sent successfully");
   } catch (error) {
@@ -750,6 +801,7 @@ function get_slot_index_from_time(time_obj, start_time) {
   console.log("Index: ", (hours - start_time) * 4 + Math.floor(minutes / 15));
   return (hours - start_time) * 4 + Math.floor(minutes / 15);
 }
+
 const createBooking = asyncHandler(async (req, res) => {
   const { _id } = req.user;
   const { podId } = req.params;
@@ -764,6 +816,11 @@ const createBooking = asyncHandler(async (req, res) => {
       bookingPurpose,
       shortDescription,
       status,
+      amountInCents,
+      pricing, // ⭐ CHANGED 1 — the app now sends the line-item breakdown
+      yocoCheckoutId,
+      yocoMerchantId,
+      yocoPaymentFacilitator,
     } = req.body;
 
     console.log("Booking creation started:", req.body);
@@ -783,13 +840,8 @@ const createBooking = asyncHandler(async (req, res) => {
     const UserID = pod.UserId;
     const serial = pod.serial;
     const password = pod.password;
-const hostemail= pod.email
-    // const bookingDateObj = moment.tz(bookingDate, "Africa/Johannesburg").toDate();
-    // const startTimeObj = moment.tz(startTime, "Africa/Johannesburg").toDate();
-    // const endTimeObj = moment.tz(endTime, "Africa/Johannesburg").toDate();
-    // const bookingDateObj = moment(bookingDate).toDate();
-    // const startTimeObj = moment(startTime).toDate();
-    // const endTimeObj = moment(endTime).toDate();
+    const hostemail = pod.email;
+
     const bookingDateObj = moment(bookingDate)
       .tz("Africa/Johannesburg")
       .toDate();
@@ -799,7 +851,6 @@ const hostemail= pod.email
     console.log("startTimeObj:", startTimeObj);
     console.log("endTimeObj:", endTimeObj);
     console.log("bookingDateObj:", bookingDateObj);
-
     console.log("START_TIME:", START_TIME);
 
     const existingBooking = await Booking.findOne({
@@ -841,8 +892,7 @@ const hostemail= pod.email
     const newBooking = await Booking.create({
       user: user._id,
       podId,
-      // podTitle:podTitle,
-      podTitle:podstitle,
+      podTitle: podstitle,
       serial: serial,
       password: password,
       Userid: UserID,
@@ -863,6 +913,29 @@ const hostemail= pod.email
     user.booking.push(newBooking._id);
     await user.save();
 
+    // update location booking count
+    const bookingPod = await productModel.findById(podId).select("location");
+    if (bookingPod && bookingPod.location) {
+      await Location.findByIdAndUpdate(bookingPod.location, {
+        $push: { booking: newBooking._id },
+      });
+    }
+
+    // ⭐ CHANGED 2 — was `if (yocoCheckoutId)`, which was NEVER true because
+    // the app never sent it, so no Transaction was ever recorded. Record the
+    // payment whenever money actually changed hands.
+    const paidCents = Number(amountInCents ?? pricing?.totalInCents ?? 0);
+    if (paidCents > 0) {
+      await Transaction.create({
+        amount: paidCents,
+        currency: "ZAR",
+        merchantId: yocoMerchantId || "N/A",
+        checkoutId: yocoCheckoutId || null,
+        paymentFacilitator: yocoPaymentFacilitator || "yoco-online-checkout",
+        status: "successful",
+      });
+    }
+
     const productAvailability = await ProductAvailability.findOne({
       product_id: podId,
       booking_date: {
@@ -882,7 +955,6 @@ const hostemail= pod.email
     console.log("Product availablity backend", productAvailability);
 
     if (productAvailability) {
-      // console.log("times: ", startTimeObj, endTimeObj);
       let updatedSlotBookings = productAvailability.slot_bookings;
       const startingIndex = get_slot_index_from_time(startTimeObj, START_TIME);
       const endingIndex = get_slot_index_from_time(endTimeObj, START_TIME);
@@ -891,12 +963,7 @@ const hostemail= pod.email
         updatedSlotBookings[i] = true;
         console.log(`Slot ${i} marked as true`);
       }
-      console.log(
-        "Starting index:",
-        startingIndex,
-        "Ending index:",
-        endingIndex
-      );
+      console.log("Starting index:", startingIndex, "Ending index:", endingIndex);
       console.log("Before update:", updatedSlotBookings);
 
       const newAvailablity = await ProductAvailability.findOneAndUpdate(
@@ -921,19 +988,27 @@ const hostemail= pod.email
       await ProductAvailability.create(data);
     }
 
-    // const responseBooking = {
-    //   ...newBooking._doc,
-    //   bookingDate: moment(newBooking.bookingDate)
-    //     // .tz("Africa/Johannesburg")
-    //     .format(),
-    //   startTime: moment(newBooking.startTime)
-    //     // .tz("Africa/Johannesburg")
-    //     .format(),
-    //   endTime: moment(newBooking.endTime).format(),
-    // };
+    // ⭐ CHANGED 3 — build the payment context the invoice needs. Without this
+    // generateInvoicePDF had no real amount and invented one from pod.price.
+    const paymentInfo = {
+      amountInCents: paidCents,
+      currency: "ZAR",
+      checkoutId: yocoCheckoutId || null,
+      merchantId: yocoMerchantId || null,
+      paymentFacilitator: yocoPaymentFacilitator || "yoco-online-checkout",
+      pricing: pricing || null,
+    };
 
-    sendNotificationOnBooking(user, newBooking);
-    sendNotificationOnHost(user, newBooking, hostemail);
+    // ⭐ CHANGED 4 — pass paymentInfo, and attach .catch() to both. These run
+    // detached from the request; an unhandled rejection here can kill the
+    // process, and an email failure must never fail an already-saved booking.
+    sendNotificationOnBooking(user, newBooking, paymentInfo).catch((e) =>
+      console.error("booking email failed:", e)
+    );
+    sendNotificationOnHost(user, newBooking, hostemail).catch((e) =>
+      console.error("host email failed:", e)
+    );
+
     console.log("Booking created successfully:", newBooking._id);
     res.status(201).json({
       message: "Booking created successfully",
@@ -946,6 +1021,7 @@ const hostemail= pod.email
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
 
 // const sendNotificationOnBooking = asyncHandler(
 //   async (user = null, booking, userId = null) => {
@@ -1001,278 +1077,182 @@ const hostemail= pod.email
 //   }
 // );
 
-
-
-const generateInvoicePDF = async (user, booking) => {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({ margin: 50 });
-      const invoiceDir = path.join(__dirname, '../invoices');
-      
-      // Create invoices directory if it doesn't exist
-      if (!fs.existsSync(invoiceDir)) {
-        fs.mkdirSync(invoiceDir, { recursive: true });
-      }
-      
-      const filename = `invoice_${booking._id}_${Date.now()}.pdf`;
-      const filepath = path.join(invoiceDir, filename);
-      
-      // Pipe the PDF to a file
-      doc.pipe(fs.createWriteStream(filepath));
-      
-      // Add company header
-      doc.fontSize(20).text('INVOICE', 50, 50, { align: 'center' });
-      doc.moveDown();
-      
-      // Company details (customize with your company info)
-      doc.fontSize(12)
-         .text('Your Company Name', 50, 100)
-         .text('Your Address', 50, 115)
-         .text('City, State, ZIP', 50, 130)
-         .text('Phone: Your Phone Number', 50, 145)
-         .text('Email: your@email.com', 50, 160);
-      
-      // Invoice details
-      doc.text(`Invoice #: INV-${booking._id}`, 350, 100)
-         .text(`Date: ${new Date().toDateString()}`, 350, 115)
-         .text(`Due Date: ${new Date().toDateString()}`, 350, 130);
-      
-      // Customer details
-      doc.moveDown(2);
-      doc.text('Bill To:', 50, 200)
-         .text(`${user.firstname} ${user.lastname || ''}`, 50, 215)
-         .text(`${user.email}`, 50, 230)
-         .text(`${user.mobile || 'N/A'}`, 50, 245);
-      
-      // Booking details section
-      doc.moveDown(2);
-      const formattedBookingDate = booking.bookingDate.toDateString();
-      const formattedStartTime = moment(booking.startTime).format("hh:mm A");
-      const formattedEndTime = moment(booking.endTime).format("hh:mm A");
-      
-      // Table header
-      const tableTop = 320;
-      doc.text('Description', 50, tableTop)
-         .text('Date', 250, tableTop)
-         .text('Time', 350, tableTop)
-         .text('Amount', 450, tableTop);
-      
-      // Draw line under header
-      doc.moveTo(50, tableTop + 15)
-         .lineTo(550, tableTop + 15)
-         .stroke();
-      
-      // Table content
-      const itemTop = tableTop + 30;
-      doc.text(`${booking.podTitle} - ${booking.bookingPurpose || 'Pod Booking'}`, 50, itemTop)
-         .text(formattedBookingDate, 250, itemTop)
-         .text(`${formattedStartTime} - ${formattedEndTime}`, 350, itemTop);
-      
-      // Calculate duration and amount (customize pricing logic as needed)
-      const duration = moment(booking.endTime).diff(moment(booking.startTime), 'hours', true);
-      const hourlyRate = booking.podId?.price || 50; // Default rate or get from pod
-      const totalAmount = (duration * hourlyRate).toFixed(2);
-      
-      doc.text(`$${totalAmount}`, 450, itemTop);
-      
-      // Draw line under item
-      doc.moveTo(50, itemTop + 15)
-         .lineTo(550, itemTop + 15)
-         .stroke();
-      
-      // Total section
-      const totalTop = itemTop + 50;
-      doc.text('Subtotal:', 400, totalTop)
-         .text(`$${totalAmount}`, 450, totalTop);
-      
-      doc.text('Tax (0%):', 400, totalTop + 15)
-         .text('$0.00', 450, totalTop + 15);
-      
-      doc.fontSize(14).text('Total:', 400, totalTop + 40)
-         .text(`$${totalAmount}`, 450, totalTop + 40);
-      
-      // Payment terms
-      doc.fontSize(10)
-         .text('Payment Terms: Due upon receipt', 50, totalTop + 80)
-         .text('Thank you for your business!', 50, totalTop + 100);
-      
-      // Add booking details
-      doc.moveDown(2);
-      doc.text('Booking Details:', 50, totalTop + 130)
-         .text(`Booking ID: ${booking._id}`, 50, totalTop + 145)
-         .text(`Pod Serial: ${booking.serial}`, 50, totalTop + 160)
-         .text(`Location: ${booking.location || 'N/A'}`, 50, totalTop + 175)
-         .text(`Status: ${booking.status}`, 50, totalTop + 190);
-      
-      // Finalize the PDF
-      doc.end();
-      
-      // Wait for the PDF to be written completely
-      doc.on('end', () => {
-        resolve(filepath);
-      });
-      
-    } catch (error) {
-      reject(error);
-    }
-  });
+const resolvePodLocation = async (pod) => {
+  if (!pod?.location) return null;
+  try {
+    const loc = await Location.findById(pod.location);
+    if (!loc) return null;
+    return (
+      [loc.name, loc.address, loc.city].filter(Boolean).join(", ") || null
+    );
+  } catch (err) {
+    console.error("resolvePodLocation failed:", err.message);
+    return null;
+  }
 };
 
-const sendNotificationOnBooking = asyncHandler(
-  async (user = null, booking, userId = null) => {
-    console.log("bookingimp", booking);
-    try {
-      if (!user && !userId) {
-        throw new Error("Any one of User or UserId is required");
-      }
-      if (!user) {
-        user = await User.findById(userId);
-      }
-      if (!user) throw new Error("User not found");
+/* ------------------------------ email shell ---------------------------- */
+// Table-based with inline styles. Gmail strips <style> blocks and Outlook
+// (Word rendering engine) ignores flex/grid, so everything is <table> + inline.
+const emailShell = ({ title, intro, rows, footNote }) => {
+  const row = ([k, v]) => `
+    <tr>
+      <td style="padding:9px 0;font:400 13px/18px Arial,Helvetica,sans-serif;color:#6B7280;width:42%;" valign="top">${k}</td>
+      <td style="padding:9px 0;font:700 13px/18px Arial,Helvetica,sans-serif;color:#1A1A1A;" valign="top">${v}</td>
+    </tr>`;
 
-      // Populate booking with pod details
-      if (typeof booking.populate === 'function') {
-        booking = await booking.populate("podId");
-      } else {
-        // If booking is already a plain object, fetch pod details separately
-        const Pod = require('../models/productModel'); // Adjust path as needed
-        booking.podId = await Pod.findById(booking.podId);
-      }
-      
-      if (!booking) throw new Error("Booking not found");
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F3F4F6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;">
+    <tr><td align="center" style="padding:24px 12px;">
 
-      // Format booking date and times
-      const formattedBookingDate = booking.bookingDate.toDateString();
-      const formattedStartTime = moment(booking.startTime).format("hh:mm A");
-      const formattedEndTime = moment(booking.endTime).format("hh:mm A");
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+             style="max-width:600px;width:100%;background:#FFFFFF;border-radius:12px;overflow:hidden;">
 
-      // Generate invoice PDF
-      console.log("Generating invoice PDF...");
-      const invoicePath = await generateInvoicePDF(user, booking);
-      console.log("Invoice PDF generated at:", invoicePath);
+        <tr><td style="height:4px;background:#E90E8B;font-size:0;line-height:0;">&nbsp;</td></tr>
 
-      // Construct email content
-      const emailContent = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Booking Confirmation</h2>
-          <p>Hi ${user.firstname},</p>
-          <p>Thank you for your booking! Please find your booking details and invoice below:</p>
-          
-          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="color: #333; margin-top: 0;">Booking Details</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Booking ID:</td>
-                <td style="padding: 8px 0;">${booking._id}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Date:</td>
-                <td style="padding: 8px 0;">${formattedBookingDate}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Time:</td>
-                <td style="padding: 8px 0;">${formattedStartTime} - ${formattedEndTime}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Pod:</td>
-                <td style="padding: 8px 0;">${booking.podTitle}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Location:</td>
-                <td style="padding: 8px 0;">${booking.location || 'N/A'}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Status:</td>
-                <td style="padding: 8px 0;">${booking.status}</td>
-              </tr>
-            </table>
-          </div>
-          
-          <p>Your invoice is attached to this email. Please keep it for your records.</p>
-          <p>If you have any questions, please don't hesitate to contact us.</p>
-          <p>Thank you for booking with us!</p>
-        </div>
-      `;
+        <tr><td style="padding:28px 32px 8px 32px;">
+          <p style="margin:0;font:700 20px/26px Arial,Helvetica,sans-serif;color:#1A1A1A;">${title}</p>
+        </td></tr>
 
-      // Send email with attachment
-      const emailData = {
-        to: user.email,
-        subject: "Booking Confirmation & Invoice",
-        html: emailContent,
-        attachments: [
-          {
-            filename: `Invoice_${booking._id}.pdf`,
-            path: invoicePath,
-            contentType: 'application/pdf'
-          }
-        ]
-      };
+        <tr><td style="padding:0 32px 16px 32px;">
+          <p style="margin:0;font:400 14px/21px Arial,Helvetica,sans-serif;color:#4B5563;">${intro}</p>
+        </td></tr>
 
-      await sendEmail(emailData.to, emailData.subject, emailData.html, emailData.attachments);
-      console.log("Email with invoice sent successfully.");
+        <tr><td style="padding:0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                 style="background:#F8F9FB;border-radius:8px;">
+            <tr><td style="padding:6px 18px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                ${rows.map(row).join("")}
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
 
-      // Clean up - delete the temporary invoice file after sending
-      // Uncomment the following lines if you want to delete the file after sending
-      // setTimeout(() => {
-      //   if (fs.existsSync(invoicePath)) {
-      //     fs.unlinkSync(invoicePath);
-      //     console.log("Temporary invoice file deleted.");
-      //   }
-      // }, 5000); // Delete after 5 seconds
+        <tr><td style="padding:20px 32px 28px 32px;">
+          <p style="margin:0;font:400 13px/20px Arial,Helvetica,sans-serif;color:#6B7280;">${footNote}</p>
+        </td></tr>
 
-    } catch (error) {
-      console.error("Error sending notification:", error.message);
-      throw new Error("Failed to send notification");
+      </table>
+
+      <p style="margin:16px 0 0 0;font:400 11px/16px Arial,Helvetica,sans-serif;color:#9CA3AF;">
+        Privily · <a href="https://privily.co" style="color:#9CA3AF;">privily.co</a>
+      </p>
+
+    </td></tr>
+  </table>
+</body></html>`;
+};
+
+
+
+const sendNotificationOnBooking = async (user = null, booking, payment = {}, userId = null) => {
+  let invoicePath = null;
+  try {
+    if (!user && !userId) throw new Error("Any one of User or UserId is required");
+    if (!user) user = await User.findById(userId);
+    if (!user) throw new Error("User not found");
+    if (!booking) throw new Error("Booking not found");
+
+    // Always work with a plain pod document.
+    const pod =
+      booking.podId && booking.podId.title
+        ? booking.podId
+        : await productModel.findById(booking.podId);
+
+    const locationName = await resolvePodLocation(pod);
+
+    const { filepath, invoiceNumber, totalInCents } = await generateInvoicePDF(
+      user,
+      booking,
+      { ...payment, locationName }
+    );
+    invoicePath = filepath;
+
+    const rows = [
+      ["Invoice number", invoiceNumber],
+      ["Pod", booking.podTitle || pod?.title || "—"],
+      ["Location", locationName || "—"],
+      ["Date", moment(booking.bookingDate).format("D MMMM YYYY")],
+      [
+        "Time",
+        `${moment(booking.startTime).format("HH:mm")} – ${moment(booking.endTime).format("HH:mm")}`,
+      ],
+      ["Amount paid", zar(totalInCents)],
+      ["Booking reference", String(booking._id).slice(-8).toUpperCase()],
+    ];
+
+    const html = emailShell({
+      title: "Your booking is confirmed",
+      intro: `Hi ${user.firstname || "there"}, thanks for booking with Privily. Your tax invoice is attached as a PDF.`,
+      rows,
+      footNote:
+        "Show the QR code in the app when you arrive. Need help? Just reply to this email.",
+    });
+
+    await sendEmail(user.email, `Booking confirmed · ${invoiceNumber}`, html, [
+      {
+        filename: `${invoiceNumber}.pdf`,
+        path: filepath,
+        contentType: "application/pdf",
+      },
+    ]);
+
+    console.log(`Invoice ${invoiceNumber} emailed to ${user.email}`);
+  } catch (error) {
+    // Never rethrow: this runs detached from the request, and an unhandled
+    // rejection here can take the process down. The booking already succeeded.
+    console.error("sendNotificationOnBooking failed:", error);
+  } finally {
+    if (invoicePath && fs.existsSync(invoicePath)) {
+      fs.promises.unlink(invoicePath).catch(() => {});
     }
   }
-);
+};
 
+/* ----------------------------- host notice ----------------------------- */
+const sendNotificationOnHost = async (user, booking, hostemail) => {
+  try {
+    if (!hostemail) return;
+    if (!booking) throw new Error("Booking not found");
 
+    // The old code did `booking = booking.populate("podId")` with NO await,
+    // so booking became a Promise and booking.bookingDate was undefined —
+    // this function threw on every single booking.
+    const pod =
+      booking.podId && booking.podId.title
+        ? booking.podId
+        : await productModel.findById(booking.podId);
 
-const sendNotificationOnHost = asyncHandler(
-  async (user = null, booking, hostemail) => {
-    try {
-      booking = booking.populate("podId");
-      if (!booking) throw new Error("Booking not found");
+    const locationName = await resolvePodLocation(pod);
+    const guest =
+      [user?.firstname, user?.lastname].filter(Boolean).join(" ") || "A guest";
 
-      // Format booking date and times
-      const formattedBookingDate = booking.bookingDate.toDateString();
-      const formattedStartTime = moment(booking.startTime)
-        // .tz("Africa/Johannesburg")
-        .format("hh:mm A");
-      const formattedEndTime = moment(booking.endTime)
-        // .tz("Africa/Johannesburg")
-        .format("hh:mm A");
+    const html = emailShell({
+      title: "New booking for your pod",
+      intro: `${guest} has booked ${booking.podTitle || pod?.title || "your pod"}.`,
+      rows: [
+        ["Guest", guest],
+        ["Contact", user?.email || "—"],
+        ["Pod", booking.podTitle || pod?.title || "—"],
+        ["Location", locationName || "—"],
+        ["Date", moment(booking.bookingDate).format("D MMMM YYYY")],
+        [
+          "Time",
+          `${moment(booking.startTime).format("HH:mm")} – ${moment(booking.endTime).format("HH:mm")}`,
+        ],
+        ["Booking reference", String(booking._id).slice(-8).toUpperCase()],
+      ],
+      footNote: "No action is needed — the guest has already paid.",
+    });
 
-      // Construct email content
-      const emailContent = `
-      <p>This booking is for ${user.firstname},</p>
-      <p>His booking details are:</p>
-      <ul>
-        <li><strong>Booking ID:</strong> ${booking._id}</li>
-        <li><strong>Booking Date:</strong> ${formattedBookingDate}</li>
-        <li><strong>Start Time:</strong> ${formattedStartTime}</li>
-        <li><strong>End Time:</strong> ${formattedEndTime}</li>
-        <li><strong>Pod ID:</strong> ${booking.podId}</li>
-        <li><strong>Pod ID:</strong> ${booking.podTitle}</li>
-      </ul>
-      <p>Thank you for booking with us!</p>
-    `;
-
-      // Send email
-      const data = {
-        to: hostemail,
-        subject: "Booking Notification",
-        html: emailContent,
-      };
-      await sendEmail(data.to, data.subject, data.html);
-      console.log("Email sent successfully.");
-    } catch (error) {
-      console.error("Error sending notification:", error.message);
-      throw new Error("Failed to send notification");
-    }
+    await sendEmail(hostemail, "New booking for your pod", html);
+  } catch (error) {
+    console.error("sendNotificationOnHost failed:", error);
   }
-);
+};
 //extend booking time
 const extendBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
@@ -1448,7 +1428,7 @@ const getBookings = asyncHandler(async (req, res) => {
         let locationName = "Unknown";
         let locationDetails = null;
 
-        if (pod && pod.location) {
+        if (bookingPod && bookingPod.location) {
           // ✅ Assuming you have a Location model imported
           const Location = require("../models/locationModel"); // adjust path as needed
           locationDetails = await Location.findById(pod.location);
@@ -2618,8 +2598,34 @@ const getAllNotification = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+const webAuth = asyncHandler(async (req, res) => {
+  const { email, phoneNumber, firstname, lastname } = req.body;
+  if (!email && !phoneNumber) {
+    return res.status(400).json({ message: "Email or phone number required" });
+  }
+  try {
+    let user = await User.findOne({ $or: [{ email }, { phoneNumber }] });
+    if (!user) {
+      user = await User.create({
+        email: email || `${phoneNumber}@privily.co`,
+        phoneNumber: phoneNumber || "",
+        firstname: firstname || "Guest",
+        lastname: lastname || "User",
+        password: Math.random().toString(36).slice(-10),
+        role: "user",
+      });
+    }
+    const token = generateToken(user._id);
+    res.json({ token, userId: user._id, user });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = {
+  webAuth,
   createUser,
+  deleteMyAccount,
   loginUserCtrl,
   loginMobileUserCtrl,
   verifyMobileOtp,
@@ -2665,3 +2671,41 @@ module.exports = {
   editStaff,
   getUserByID
 };
+
+
+const yocoCheckout = asyncHandler(async (req, res) => {
+  const { amountInCents, successUrl, cancelUrl } = req.body;
+  const response = await fetch('https://payments.yoco.com/api/checkouts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY}`,
+    },
+    body: JSON.stringify({ amount: amountInCents, currency: 'ZAR', successUrl, cancelUrl }),
+  });
+  const data = await response.json();
+  if (!response.ok) return res.status(response.status).json(data);
+  res.json(data);
+});
+module.exports.yocoCheckout = yocoCheckout;
+
+const refundBooking = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  const { checkoutId } = req.body;
+  if (!checkoutId) return res.status(400).json({ message: 'checkoutId required' });
+
+  const response = await fetch(`https://payments.yoco.com/api/checkouts/${checkoutId}/refund`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY}`,
+    },
+    body: JSON.stringify({}),
+  });
+  const data = await response.json();
+  if (!response.ok) return res.status(response.status).json(data);
+
+  await Booking.findByIdAndUpdate(bookingId, { status: 'Cancelled' });
+  res.json({ message: 'Refund issued and booking cancelled', refund: data });
+});
+module.exports.refundBooking = refundBooking;

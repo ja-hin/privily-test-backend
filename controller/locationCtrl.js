@@ -266,6 +266,7 @@ const editLocation = asyncHandler(async (req, res) => {
     latitude,
     longitude,
     isBlocked,
+    rate
   } = req.body;
 
   validateMongoDbId(id);
@@ -282,6 +283,7 @@ const editLocation = asyncHandler(async (req, res) => {
         latitude,
         longitude,
         isBlocked,
+	rate
       },
       { new: true, runValidators: true }
     );

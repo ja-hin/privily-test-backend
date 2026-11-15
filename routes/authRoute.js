@@ -2,6 +2,9 @@
 
 const express = require("express");
 const {
+  webAuth,
+  yocoCheckout,
+  refundBooking,
   createUser,
   loginUserCtrl,
   getallUser,
@@ -47,6 +50,7 @@ const {
   getUserByID,
   verifyEmail,
   getAllRatings,
+  deleteMyAccount,
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
@@ -62,10 +66,11 @@ router.post("/app-login", loginMobileUserCtrl);
 router.post("/verify-otp", verifyMobileOtp);
 router.post("/verify-page", verifyAuthPage);
 router.post("/verify-email", verifyEmail);
-
+router.delete("/delete-account", authMiddleware, deleteMyAccount);
 router.post("/register-staff", registerAndAssignRoles);
 router.get("/logout", logout);
 router.post("/admin-login", loginAdmin);
+router.post("/web-auth", webAuth);
 router.post("/create-payment", createPayment);
 router.post("/forgot-password-token", forgotPasswordToken);
 router.put("/reset-password/:token", resetPassword);
@@ -124,3 +129,5 @@ router.get("/notifications/active", authMiddleware, getAllNotification);
 router.put("/notification/send", authMiddleware, sendNotification);
 
 module.exports = router;
+router.post('/yoco-checkout', yocoCheckout);
+router.post('/refund-booking/:bookingId', refundBooking);
