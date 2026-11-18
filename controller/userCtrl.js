@@ -2679,7 +2679,7 @@ const yocoCheckout = asyncHandler(async (req, res) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY}`,
+      'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY_LIVE}`,
     },
     body: JSON.stringify({ amount: amountInCents, currency: 'ZAR', successUrl, cancelUrl }),
   });
@@ -2698,7 +2698,7 @@ const refundBooking = asyncHandler(async (req, res) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY}`,
+      'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY_LIVE}`,
     },
     body: JSON.stringify({}),
   });
