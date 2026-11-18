@@ -2754,6 +2754,29 @@ const yocoCheckout = asyncHandler(async (req, res) => {
 });
 module.exports.yocoCheckout = yocoCheckout;
 
+// Mark a cancelled booking's quarter-hour slots free again on its pod/day.
+// Shared by refund-booking; cancel-booking keeps its original inline copy.
+const releaseBookingSlots = async (booking) => {
+  const day = booking.bookingDate;
+  const productAvailability = await ProductAvailability.findOne({
+    product_id: booking.podId,
+    booking_date: {
+      $gte: new Date(day.getFullYear(), day.getMonth(), day.getDate()),
+      $lt: new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1),
+    },
+  });
+  if (!productAvailability) return;
+  const slots = productAvailability.slot_bookings;
+  const startingIndex = get_slot_index_from_time(booking.startTime, START_TIME);
+  const endingIndex = get_slot_index_from_time(booking.endTime, START_TIME);
+  for (let i = startingIndex; i < endingIndex; i++) slots[i] = false;
+  await ProductAvailability.findOneAndUpdate(
+    { _id: productAvailability._id },
+    { slot_bookings: slots },
+    { new: true }
+  );
+};
+
 const refundBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
   const { checkoutId, reference: bodyReference, gateway: bodyGateway } = req.body || {};
@@ -2798,9 +2821,21 @@ const refundBooking = asyncHandler(async (req, res) => {
     txn.refundId = refund.refundId ? String(refund.refundId) : txn.refundId;
     await txn.save();
   }
+
+  // Same side effects as cancel-booking: free the pod's time slots and tell
+  // the customer, so callers do not need a second cancel call afterwards.
+  const wasActive = booking.status !== "Cancelled";
   booking.status = "Cancelled";
   booking.isBookingActive = false;
   await booking.save();
+  if (wasActive) {
+    try {
+      await releaseBookingSlots(booking);
+    } catch (e) {
+      console.error("refund: slot release failed:", e.message);
+    }
+    sendNotificationOnCancel(booking.user, booking._id);
+  }
 
   res.json({
     message: "Refund issued and booking cancelled",
