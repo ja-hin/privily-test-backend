@@ -27,6 +27,8 @@ const path = require("path");
 const { Mongoose } = require("mongoose");
 const logoPath = path.join(__dirname, "Logo.png");
 const { generateInvoicePDF, zar } = require("./invoiceService");
+const payments = require("../services/payments");
+const { syncPaystackTransaction } = require("./PaymentCtrl");
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
@@ -821,6 +823,8 @@ const createBooking = asyncHandler(async (req, res) => {
       yocoCheckoutId,
       yocoMerchantId,
       yocoPaymentFacilitator,
+      paymentGateway,   // "yoco" | "paystack"; older apps omit it and send yoco* fields
+      paymentReference, // Paystack reference (or Yoco checkout id)
     } = req.body;
 
     console.log("Booking creation started:", req.body);
@@ -889,9 +893,52 @@ const createBooking = asyncHandler(async (req, res) => {
     const endTimeStamp = Math.floor(endTimeObj.getTime() / 1000);
     const qrCodeDataString = `F2/${deviceId}/${UserID}/0/${endTimeStamp}/${startTimeStamp}`;
 
+    // ---------------------------------------------------------------- payment
+    // Work out which gateway paid for this booking. Older app builds only
+    // send the yoco* fields, so fall back to Yoco when they are present.
+    const paidCents = Number(amountInCents ?? pricing?.totalInCents ?? 0);
+    const gateway =
+      payments.normalizeGatewayName(paymentGateway) ||
+      (yocoCheckoutId ? "yoco" : null);
+    const reference = paymentReference || yocoCheckoutId || null;
+
+    let paystackTxn = null;
+    if (paidCents > 0 && gateway === "paystack") {
+      // Never trust the redirect: confirm with Paystack that this reference
+      // was paid, for at least this amount, and has not been used already.
+      if (!reference) {
+        return res.status(400).json({ message: "paymentReference is required for Paystack bookings" });
+      }
+      let verified;
+      try {
+        verified = await syncPaystackTransaction(reference);
+      } catch (e) {
+        console.error("Paystack verify failed during booking:", e.message);
+        return res.status(502).json({ message: "Could not verify payment with Paystack. Please try again." });
+      }
+      const { result, txn } = verified;
+      if (result.status !== "successful") {
+        return res.status(402).json({ message: "Payment not completed", paymentStatus: result.status });
+      }
+      if (Number(result.amountInCents) < paidCents) {
+        return res.status(402).json({
+          message: "Paid amount does not match booking amount",
+          paidInCents: result.amountInCents,
+          expectedInCents: paidCents,
+        });
+      }
+      if (txn.booking) {
+        return res.status(409).json({ message: "This payment is already linked to a booking", bookingId: txn.booking });
+      }
+      paystackTxn = txn;
+    }
+
     const newBooking = await Booking.create({
       user: user._id,
       podId,
+      paymentGateway: paidCents > 0 ? gateway : null,
+      paymentReference: paidCents > 0 ? reference : null,
+      amountInCents: paidCents,
       podTitle: podstitle,
       serial: serial,
       password: password,
@@ -921,19 +968,33 @@ const createBooking = asyncHandler(async (req, res) => {
       });
     }
 
-    // ⭐ CHANGED 2 — was `if (yocoCheckoutId)`, which was NEVER true because
-    // the app never sent it, so no Transaction was ever recorded. Record the
-    // payment whenever money actually changed hands.
-    const paidCents = Number(amountInCents ?? pricing?.totalInCents ?? 0);
+    // Record the payment whenever money actually changed hands, and link the
+    // Transaction row to the booking so the admin can look it up by id.
+    let transactionDoc = null;
     if (paidCents > 0) {
-      await Transaction.create({
-        amount: paidCents,
-        currency: "ZAR",
-        merchantId: yocoMerchantId || "N/A",
-        checkoutId: yocoCheckoutId || null,
-        paymentFacilitator: yocoPaymentFacilitator || "yoco-online-checkout",
-        status: "successful",
-      });
+      if (paystackTxn) {
+        transactionDoc = await Transaction.findByIdAndUpdate(
+          paystackTxn._id,
+          { $set: { booking: newBooking._id, user: user._id, status: "successful" } },
+          { new: true }
+        );
+      } else {
+        transactionDoc = await Transaction.create({
+          amount: paidCents,
+          currency: "ZAR",
+          gateway: gateway || "yoco",
+          reference,
+          merchantId: yocoMerchantId || "N/A",
+          checkoutId: yocoCheckoutId || reference || null,
+          paymentFacilitator: yocoPaymentFacilitator || "yoco-online-checkout",
+          status: "successful",
+          booking: newBooking._id,
+          user: user._id,
+          customerEmail: user.email || null,
+        });
+      }
+      newBooking.transaction = transactionDoc._id;
+      await newBooking.save();
     }
 
     const productAvailability = await ProductAvailability.findOne({
@@ -993,9 +1054,13 @@ const createBooking = asyncHandler(async (req, res) => {
     const paymentInfo = {
       amountInCents: paidCents,
       currency: "ZAR",
-      checkoutId: yocoCheckoutId || null,
+      gateway: paidCents > 0 ? gateway : null,
+      checkoutId: reference,
       merchantId: yocoMerchantId || null,
-      paymentFacilitator: yocoPaymentFacilitator || "yoco-online-checkout",
+      paymentFacilitator:
+        gateway === "paystack"
+          ? "Paystack"
+          : yocoPaymentFacilitator || "yoco-online-checkout",
       pricing: pricing || null,
     };
 
@@ -2691,21 +2756,57 @@ module.exports.yocoCheckout = yocoCheckout;
 
 const refundBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
-  const { checkoutId } = req.body;
-  if (!checkoutId) return res.status(400).json({ message: 'checkoutId required' });
+  const { checkoutId, reference: bodyReference, gateway: bodyGateway } = req.body || {};
+  validateMongoDbId(bookingId);
 
-  const response = await fetch(`https://payments.yoco.com/api/checkouts/${checkoutId}/refund`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.YOCO_SECRET_KEY_LIVE}`,
-    },
-    body: JSON.stringify({}),
+  const booking = await Booking.findById(bookingId);
+  if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+  // Prefer the Transaction linked to the booking; fall back to whatever
+  // identifier the caller sent (older admin builds send a Yoco checkoutId).
+  let txn = await Transaction.findOne({ booking: booking._id, status: { $ne: "refunded" } });
+  const reference = bodyReference || checkoutId || booking.paymentReference || (txn && txn.reference);
+  if (!txn && reference) {
+    txn = await Transaction.findOne({ $or: [{ reference }, { checkoutId: reference }] });
+  }
+  if (!reference) {
+    return res.status(400).json({ message: "No payment reference found for this booking" });
+  }
+  if (txn && txn.status === "refunded") {
+    return res.status(409).json({ message: "This payment was already refunded" });
+  }
+
+  const gatewayName =
+    payments.normalizeGatewayName(bodyGateway) ||
+    (txn && txn.gateway) ||
+    booking.paymentGateway ||
+    "yoco";
+
+  let refund;
+  try {
+    refund = await payments.getGateway(gatewayName).refund({ reference });
+  } catch (error) {
+    console.error(`Refund via ${gatewayName} failed:`, error.data || error.message);
+    const status = error.status && error.status >= 400 && error.status < 600 ? error.status : 502;
+    return res.status(status).json({ message: error.message || "Refund failed", error: error.data || null });
+  }
+
+  const now = new Date();
+  if (txn) {
+    txn.status = "refunded";
+    txn.refundedAt = now;
+    txn.refundId = refund.refundId ? String(refund.refundId) : txn.refundId;
+    await txn.save();
+  }
+  booking.status = "Cancelled";
+  booking.isBookingActive = false;
+  await booking.save();
+
+  res.json({
+    message: "Refund issued and booking cancelled",
+    gateway: gatewayName,
+    reference,
+    refund: refund.raw || refund,
   });
-  const data = await response.json();
-  if (!response.ok) return res.status(response.status).json(data);
-
-  await Booking.findByIdAndUpdate(bookingId, { status: 'Cancelled' });
-  res.json({ message: 'Refund issued and booking cancelled', refund: data });
 });
 module.exports.refundBooking = refundBooking;

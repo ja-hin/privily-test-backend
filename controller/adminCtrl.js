@@ -6,6 +6,30 @@ const productModel = require("../models/productModel");
 const locationModel = require("../models/locationModel");
 const registerstaff = require("../models/registerstaff");
 
+// Bookings created after the Paystack work carry a transaction link. Older
+// bookings have none, so fall back to the time-window match used before.
+const findTransactionForBooking = async (booking) => {
+  if (booking.transaction) {
+    const byId = await Transaction.findById(booking.transaction);
+    if (byId) return byId;
+  }
+  const byBooking = await Transaction.findOne({ booking: booking._id }).sort({ createdAt: -1 });
+  if (byBooking) return byBooking;
+  if (booking.paymentReference) {
+    const byRef = await Transaction.findOne({
+      $or: [{ reference: booking.paymentReference }, { checkoutId: booking.paymentReference }],
+    });
+    if (byRef) return byRef;
+  }
+  return Transaction.findOne({
+    booking: null,
+    createdAt: {
+      $gte: new Date(booking.createdAt.getTime() - 10 * 60 * 1000),
+      $lte: new Date(booking.createdAt.getTime() + 10 * 60 * 1000),
+    },
+  }).sort({ createdAt: 1 });
+};
+
 // GET /api/admin/stats
 const getAdminStats = asyncHandler(async (req, res) => {
   try {
@@ -130,12 +154,7 @@ const getAllBookingsAdmin = asyncHandler(async (req, res) => {
     const bookingsWithTransaction = await Promise.all(
       bookings.map(async (b) => {
         const bookingObj = b.toObject();
-        const txn = await Transaction.findOne({
-          createdAt: {
-            $gte: new Date(b.createdAt.getTime() - 10 * 60 * 1000),
-            $lte: new Date(b.createdAt.getTime() + 10 * 60 * 1000),
-          },
-        }).sort({ createdAt: 1 });
+        const txn = await findTransactionForBooking(b);
         return { ...bookingObj, transaction: txn || null };
       })
     );
@@ -173,12 +192,7 @@ const getBookingDetail = asyncHandler(async (req, res) => {
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
     // Find matching transaction (within 10 min of booking creation)
-    const transaction = await Transaction.findOne({
-      createdAt: {
-        $gte: new Date(booking.createdAt.getTime() - 10 * 60 * 1000),
-        $lte: new Date(booking.createdAt.getTime() + 10 * 60 * 1000),
-      },
-    }).sort({ createdAt: 1 });
+    const transaction = await findTransactionForBooking(booking);
 
     res.json({ booking, transaction: transaction || null });
   } catch (error) {
@@ -223,9 +237,10 @@ const getAllUsersAdmin = asyncHandler(async (req, res) => {
 // GET /api/admin/transactions?page=&limit=&status=
 const getAllTransactionsAdmin = asyncHandler(async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, startDate, endDate, search } = req.query;
+    const { page = 1, limit = 20, status, startDate, endDate, search, gateway } = req.query;
     const filter = {};
     if (status && status !== "all") filter.status = status;
+    if (gateway && gateway !== "all") filter.gateway = gateway;
     if (startDate || endDate) {
       filter.createdAt = {};
       if (startDate) filter.createdAt.$gte = new Date(startDate);
@@ -233,6 +248,8 @@ const getAllTransactionsAdmin = asyncHandler(async (req, res) => {
     }
     if (search) filter.$or = [
       { checkoutId: { $regex: search, $options: 'i' } },
+      { reference: { $regex: search, $options: 'i' } },
+      { customerEmail: { $regex: search, $options: 'i' } },
       { _id: search.length === 24 ? search : undefined },
       { merchantId: { $regex: search, $options: 'i' } },
     ].filter(c => Object.values(c)[0] !== undefined);

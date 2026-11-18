@@ -23,13 +23,20 @@ const appVersionRouter = require("./routes/appVersionRoute");
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const cors = require("cors");
-const { createPayment } = require("./controller/PaymentCtrl");
+const { paystackWebhook } = require("./controller/PaymentCtrl");
 
 require('./cron/bookingcron');
 
 dbConnect();
 app.use(morgan("dev"));
 app.use(cors());
+// Paystack signs the raw body, so this route must see the bytes before the
+// JSON parser rewrites them. Public URL: /test/api/payments/paystack/webhook
+app.post(
+  "/api/payments/paystack/webhook",
+  express.raw({ type: "*/*", limit: "1mb" }),
+  paystackWebhook
+);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());

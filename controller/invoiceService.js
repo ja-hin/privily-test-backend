@@ -371,6 +371,8 @@ const generateInvoicePDF = async (user, booking, payment = {}) => {
       const paidVia =
         totalInCents === 0
           ? "No charge — complimentary booking"
+          : payment.gateway === "paystack"
+          ? "Paystack"
           : `${payment.paymentFacilitator || "Yoco online checkout"}`;
 
       const payLines = [

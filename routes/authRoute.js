@@ -54,7 +54,7 @@ const {
 } = require("../controller/userCtrl");
 
 const { authMiddleware, isAdmin } = require("../middlew/authMIddleware");
-const { createPayment } = require("../controller/PaymentCtrl");
+const { createPayment, paystackInitialize, paystackVerify } = require("../controller/PaymentCtrl");
 
 const router = express.Router();
 
@@ -131,3 +131,8 @@ router.put("/notification/send", authMiddleware, sendNotification);
 module.exports = router;
 router.post('/yoco-checkout', yocoCheckout);
 router.post('/refund-booking/:bookingId', refundBooking);
+
+// Paystack — same URL style as yoco-checkout so the app and website can
+// switch between gateways with one path change.
+router.post('/paystack-checkout', paystackInitialize);
+router.get('/paystack-verify/:reference', paystackVerify);

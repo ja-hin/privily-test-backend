@@ -79,6 +79,25 @@ const bookingSchema = new mongoose.Schema(
       rating: { type: Number },
       message: { type: String },
     },
+    // Payment summary. Filled for paid bookings; absent on free/host bookings.
+    paymentGateway: {
+      type: String,
+      enum: ["yoco", "paystack", null],
+      default: null,
+    },
+    paymentReference: {
+      type: String,
+      default: null,
+    },
+    amountInCents: {
+      type: Number,
+      default: 0,
+    },
+    transaction: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Transaction",
+      default: null,
+    },
   },
   {
     timestamps: true,
